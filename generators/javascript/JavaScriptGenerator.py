@@ -163,9 +163,11 @@ class JavaScriptGenerator:
                     self._generate_attributes(self.schema[attribute['type']]['layout'])
                 elif attribute['disposition'] == TypeDescriptorDisposition.Const.value:
                     self.constructor_initial_values[attribute['name']] = attribute['value']
-                    self.new_class.add_getter_setter(attribute['name'])
+                    if self._get_attribute_name_if_sizeof(attribute['name'], attributes) is None:
+                        self.new_class.add_getter_setter(attribute['name'])
             else:
-                self.new_class.add_getter_setter(attribute['name'])
+                if self._get_attribute_name_if_sizeof(attribute['name'], attributes) is None:
+                    self.new_class.add_getter_setter(attribute['name'])
 
     def _generate_struct(self, type_descriptor, struct):
         self.new_class = JavaScriptClassGenerator(type_descriptor)
