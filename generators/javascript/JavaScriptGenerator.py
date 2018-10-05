@@ -17,8 +17,11 @@ def indent(code, n_indents=1):
 
 
 class JavaScriptMethodGenerator:
-    def __init__(self, signature, params=[]):
-        self.method_output = ['{} = ({}) => {{'.format(signature, ', '.join(params))]
+    def __init__(self, signature, params=[], static=False):
+        if static:
+            self.method_output = ['static {}() {{'.format(signature, ', '.join(params))]
+        else:
+            self.method_output = ['{} = ({}) => {{'.format(signature, ', '.join(params))]
 
     def add_instructions(self, instructions):
         for instruction in instructions:
@@ -98,11 +101,63 @@ class JavaScriptGenerator:
             if 'size' in attribute and attribute['size'] == attribute_name:
                 return attribute['name']
 
-    def _generate_load_from_binary_method(self):
-        load_from_binary_method = JavaScriptMethodGenerator('loadFromBinary', ['binary'])
-        load_from_binary_method.add_instructions(['// TODO: To be initialized'])
-        load_from_binary_method.add_instructions(['return new {}()'.format(self.new_class.class_signature)])
-        self.new_class.add_method(load_from_binary_method)
+    def _generate_load_from_binary_attributes(self, attributes):
+        context = {}  # Stores meta size information for dynamic length attributes
+        for attribute in attributes:
+            if 'disposition' in attribute:
+                if attribute['disposition'] == TypeDescriptorDisposition.Inline.value:
+                    self._generate_load_from_binary_attributes(self.schema[attribute['type']]['layout'])
+                elif attribute['disposition'] == TypeDescriptorDisposition.Const.value:
+                    self.load_from_binary_method.add_instructions(['var {0} = consumableBuffer.get_bytes({1})'.format(attribute['name'], self._get_type_size(attribute))])
+                    self.load_from_binary_method.add_instructions(['object.{0} = {0}'.format(attribute['name'])])
+            else:
+                sizeof_attribute_name = self._get_attribute_name_if_sizeof(attribute['name'], attributes)
+                if sizeof_attribute_name is not None:
+                    self.load_from_binary_method.add_instructions(['var {0}DataView = new DataView(consumableBuffer.get_bytes({1}), 0)'.format(attribute['name'], attribute['size'])])
+                    self.load_from_binary_method.add_instructions(['var {0} = {0}DataView.getInt32(1)'.format(attribute['name'])])
+                    context[attribute['name']] = attribute['size']
+                else:
+                    if attribute['type'] == TypeDescriptorType.Byte.value:
+                        if isinstance(attribute['size'], int):
+                            self.load_from_binary_method.add_instructions(['var {0} = consumableBuffer.get_bytes({1})'.format(attribute['name'], self._get_type_size(attribute))])
+                            self.load_from_binary_method.add_instructions(['object.{0} = {0}'.format(attribute['name'])])
+                        else:
+                            self.load_from_binary_method.add_instructions(['var {} = []'.format(attribute['name'])])
+                            self.load_from_binary_method.add_instructions(['for (i = 0; i < {0}; i++) {{'.format(attribute['size'])])
+                            self.load_from_binary_method.add_instructions([indent('{0}.push(consumableBuffer.get_bytes({1}))'.format(attribute['name'], context[attribute['size']]))])
+                            self.load_from_binary_method.add_instructions(['}', 'object.{0} = {0}'.format(attribute['name'])])
+
+                    # Struct object
+                    else:
+                        # Required to check if typedef or struct definition (depends if type of typedescriptor is Struct or Byte)
+                        attribute_typedescriptor = self.schema[attribute['type']]
+
+                        # Array of objects
+                        if 'size' in attribute:
+                            # No need to check if attribute['size'] is int (fixed) or a variable reference, because attribute['size'] will either be a number or a previously code generated reference
+                            self.load_from_binary_method.add_instructions(['object.{} = []'.format(attribute['name'])])
+                            self.load_from_binary_method.add_instructions(['for (i = 0; i < {}; i++) {{'.format(attribute['size'])])
+                            if attribute_typedescriptor['type'] == TypeDescriptorType.Struct.value:
+                                self.load_from_binary_method.add_instructions([indent('var new{0} = {1}.loadFromBinary(consumableBuffer)'.format(attribute['name'], JavaScriptClassGenerator.get_generated_class_signature(attribute['type'])))])
+                            elif attribute_typedescriptor['type'] == TypeDescriptorType.Byte.value:
+                                self.load_from_binary_method.add_instructions([indent('var new{0} = consumableBuffer.get_bytes({1})'.format(attribute['name'], self._get_type_size(attribute_typedescriptor)))])
+                            self.load_from_binary_method.add_instructions([indent('object.{0}.push(new{0})'.format(attribute['name']))])
+                            self.load_from_binary_method.add_instructions(['}'])
+
+                        # Single object
+                        else:
+                            if attribute_typedescriptor['type'] == TypeDescriptorType.Struct.value:
+                                self.load_from_binary_method.add_instructions(['var {0} = {1}.loadFromBinary(consumableBuffer)'.format(attribute['name'], JavaScriptClassGenerator.get_generated_class_signature(attribute['type']))])
+                            elif attribute_typedescriptor['type'] == TypeDescriptorType.Byte.value:
+                                self.load_from_binary_method.add_instructions(['var {0} = consumableBuffer.get_bytes({1})'.format(attribute['name'], self._get_type_size(attribute_typedescriptor))])
+                            self.load_from_binary_method.add_instructions(['object.{0} = {0}'.format(attribute['name'])])
+
+    def _generate_load_from_binary_method(self, attributes):
+        self.load_from_binary_method = JavaScriptMethodGenerator('loadFromBinary', ['consumableBuffer'], True)
+        self.load_from_binary_method.add_instructions(['var object = new {}()'.format(self.new_class.class_signature)])
+        self._generate_load_from_binary_attributes(attributes)
+        self.load_from_binary_method.add_instructions(['return object'])
+        self.new_class.add_method(self.load_from_binary_method)
 
     def _generate_serialize_attributes(self, attributes):
         for attribute in attributes:
@@ -110,8 +165,8 @@ class JavaScriptGenerator:
                 if attribute['disposition'] == TypeDescriptorDisposition.Inline.value:
                     self._generate_serialize_attributes(self.schema[attribute['type']]['layout'])
                 elif attribute['disposition'] == TypeDescriptorDisposition.Const.value:
-                    self.serialize_method.add_instructions(['var fitArray = fit_bytearray(this.{}, {})'.format(attribute['name'], self._get_type_size(attribute))])
-                    self.serialize_method.add_instructions(['newArray = concat_typedarrays(newArray, fitArray)'])
+                    self.serialize_method.add_instructions(['var fitArray{0} = fit_bytearray(this.{0}, {1})'.format(attribute['name'], self._get_type_size(attribute))])
+                    self.serialize_method.add_instructions(['newArray = concat_typedarrays(newArray, fitArray{})'.format(attribute['name'])])
             else:
                 sizeof_attribute_name = self._get_attribute_name_if_sizeof(attribute['name'], attributes)
                 if sizeof_attribute_name is not None:
@@ -119,35 +174,36 @@ class JavaScriptGenerator:
                 else:
                     if attribute['type'] == TypeDescriptorType.Byte.value:
                         if isinstance(attribute['size'], int):
-                            self.serialize_method.add_instructions(['var fitArray = fit_bytearray(this.{}, {})'.format(attribute['name'], self._get_type_size(attribute))])
-                            self.serialize_method.add_instructions(['newArray = concat_typedarrays(newArray, fitArray)'])
+                            self.serialize_method.add_instructions(['var fitArray{0} = fit_bytearray(this.{0}, {1})'.format(attribute['name'], self._get_type_size(attribute))])
+                            self.serialize_method.add_instructions(['newArray = concat_typedarrays(newArray, fitArray{})'.format(attribute['name'])])
                         else:
                             self.serialize_method.add_instructions(['for (element in this.{}) {{'.format(attribute['name'])])
                             self.serialize_method.add_instructions([indent('newArray = concat_typedarrays(newArray, element)')])
-                            self.serialize_method.add_instructions(['}}'])
-                    else:   # Struct / Typedef
+                            self.serialize_method.add_instructions(['}'])
+
+                    # Struct object
+                    else:
+                        # Required to check if typedef or struct definition (depends if type of typedescriptor is Struct or Byte)
                         attribute_typedescriptor = self.schema[attribute['type']]
+
+                        # Array of objects
                         if 'size' in attribute:
-                            if isinstance(attribute['size'], int):
-                                if attribute_typedescriptor['type'] == TypeDescriptorType.Struct.value:
-                                    self.serialize_method.add_instructions(['newArray = concat_typedarrays(newArray, this.{}.serialize())'.format(attribute['name'])])
-                                elif attribute_typedescriptor['type'] == TypeDescriptorType.Byte.value:
-                                    self.serialize_method.add_instructions(['var fitArray = fit_bytearray(this.{}, {})'.format(attribute['name'], self._get_type_size(attribute_typedescriptor))])
-                                    self.serialize_method.add_instructions(['newArray = concat_typedarrays(newArray, fitArray)'])
-                            else:
-                                self.serialize_method.add_instructions(['for (element in this.{}) {{'.format(attribute['name'])])
-                                if attribute_typedescriptor['type'] == TypeDescriptorType.Struct.value:
-                                    self.serialize_method.add_instructions([indent('newArray = concat_typedarrays(newArray, element.serialize())')])
-                                elif attribute_typedescriptor['type'] == TypeDescriptorType.Byte.value:
-                                    self.serialize_method.add_instructions([indent('var fitArray = fit_bytearray(this.{}, {})'.format(attribute['name'], self._get_type_size(attribute_typedescriptor)))])
-                                    self.serialize_method.add_instructions([indent('newArray = concat_typedarrays(newArray, fitArray)')])
-                                self.serialize_method.add_instructions(['}}'])
+                            # No need to check if attribute['size'] is int (fixed) or a variable reference, because we iterate with a for util in both cases
+                            self.serialize_method.add_instructions(['for (element in this.{}) {{'.format(attribute['name'])])
+                            if attribute_typedescriptor['type'] == TypeDescriptorType.Struct.value:
+                                self.serialize_method.add_instructions([indent('newArray = concat_typedarrays(newArray, element.serialize())')])
+                            elif attribute_typedescriptor['type'] == TypeDescriptorType.Byte.value:
+                                self.serialize_method.add_instructions([indent('var fitArray{0} = fit_bytearray(this.{0}, {1})'.format(attribute['name'], self._get_type_size(attribute_typedescriptor)))])
+                                self.serialize_method.add_instructions([indent('newArray = concat_typedarrays(newArray, fitArray{})'.format(attribute['name']))])
+                            self.serialize_method.add_instructions(['}'])
+                        
+                        # Single object
                         else:
                             if attribute_typedescriptor['type'] == TypeDescriptorType.Struct.value:
                                 self.serialize_method.add_instructions(['newArray = concat_typedarrays(newArray, this.{}.serialize())'.format(attribute['name'])])
                             elif attribute_typedescriptor['type'] == TypeDescriptorType.Byte.value:
-                                self.serialize_method.add_instructions(['var fitArray = fit_bytearray(this.{}, {})'.format(attribute['name'], self._get_type_size(attribute_typedescriptor))])
-                                self.serialize_method.add_instructions(['newArray = concat_typedarrays(newArray, fitArray)'])
+                                self.serialize_method.add_instructions(['var fitArray{0} = fit_bytearray(this.{0}, {1})'.format(attribute['name'], self._get_type_size(attribute_typedescriptor))])
+                                self.serialize_method.add_instructions(['newArray = concat_typedarrays(newArray, fitArray{})'.format(attribute['name'])])
 
     def _generate_serialize_method(self, attributes):
         self.serialize_method = JavaScriptMethodGenerator('serialize')
@@ -175,7 +231,7 @@ class JavaScriptGenerator:
         self._generate_attributes(struct['layout'])
         if self.constructor_initial_values:
             self.new_class.add_constructor(self.constructor_initial_values)
-        self._generate_load_from_binary_method()
+        self._generate_load_from_binary_method(struct['layout'])
         self._generate_serialize_method(struct['layout'])
         return self.new_class.get_class()
 
@@ -192,26 +248,44 @@ class JavaScriptGenerator:
     def _gengerate_fit_bytearray(self):
         concat_method = JavaScriptMethodGenerator('fit_bytearray', ['array', 'size'])
         concat_method.add_instructions([
-            'if (array == null)',
-            indent('return new Uint8Array(size)'),
+            'if (array == null) {',
+            indent('var newArray = new Uint8Array(size)'),
+            indent('newArray.fill(0)'),
+            indent('return newArray'),
+            '}',
             'if (array.length > size) {',
             indent('throw "Data size larger than allowed"'),
             '}',
             'else if (array.length < size) {',
             indent('var newArray = new Uint8Array(size)'),
             indent('newArray.fill(0)'),
-            indent('newArray.set(array, size - array.length'),
+            indent('newArray.set(array, size - array.length)'),
             indent('return new_array'),
             '}',
             'return array',
         ])
         return concat_method.get_method()
 
+    def _generate_Uint8Array_consumer(self):
+        self.consumer_class = JavaScriptClassGenerator('Uint8ArrayConsumable')
+        self.consumer_class.add_constructor({'offset': 0, 'binary': 'binary'}, ['binary'])
+
+        get_bytes_method = JavaScriptMethodGenerator('get_bytes', ['count'])
+        get_bytes_method.add_instructions([
+            'var bytes = this.binary.slice(this.offset, this.offset + count)',
+            'this.offset += count',
+            'return bytes',
+        ])
+        self.consumer_class.add_method(get_bytes_method)
+
+        return self.consumer_class.get_class()
+
     def generate(self):
         new_file = ['/*** File automatically generated by Catbuffer ***/', '']
 
         new_file += self._gengerate_typedarray_concat() + ['']
         new_file += self._gengerate_fit_bytearray() + ['']
+        new_file += self._generate_Uint8Array_consumer() + ['']
 
         for type_descriptor, value in self.schema.items():
             if value['type'] == TypeDescriptorType.Byte.value:
