@@ -18,10 +18,11 @@ def indent(code, n_indents=1):
 
 class JavaScriptMethodGenerator:
     def __init__(self, signature, params=[], static=False):
+        self.signature = signature
         if static:
-            self.method_output = ['static {}() {{'.format(signature, ', '.join(params))]
+            self.method_output = ['static {}() {{'.format(self.signature, ', '.join(params))]
         else:
-            self.method_output = ['{} = ({}) => {{'.format(signature, ', '.join(params))]
+            self.method_output = ['{} = ({}) => {{'.format(self.signature, ', '.join(params))]
 
     def add_instructions(self, instructions):
         for instruction in instructions:
@@ -46,7 +47,7 @@ class JavaScriptClassGenerator:
 
     def __init__(self, signature):
         self.class_signature = JavaScriptClassGenerator.get_generated_class_signature(signature)
-        self.class_output = ['export class {} {{'.format(self.class_signature)]
+        self.class_output = ['class {} {{'.format(self.class_signature)]
 
     def add_constructor(self, initial_values, params=[]):
         new_constructor = [indent('constructor({}) {{'.format(', '.join(params)))]
@@ -113,8 +114,7 @@ class JavaScriptGenerator:
             else:
                 sizeof_attribute_name = self._get_attribute_name_if_sizeof(attribute['name'], attributes)
                 if sizeof_attribute_name is not None:
-                    self.load_from_binary_method.add_instructions(['var {0}DataView = new DataView(consumableBuffer.get_bytes({1}), 0)'.format(attribute['name'], attribute['size'])])
-                    self.load_from_binary_method.add_instructions(['var {0} = {0}DataView.getInt32(1)'.format(attribute['name'])])
+                    self.load_from_binary_method.add_instructions(['var {0} = buffer_to_int(consumableBuffer.get_bytes({1}))'.format(attribute['name'], attribute['size'])])
                     context[attribute['name']] = attribute['size']
                 else:
                     if attribute['type'] == TypeDescriptorType.Byte.value:
@@ -196,7 +196,7 @@ class JavaScriptGenerator:
                                 self.serialize_method.add_instructions([indent('var fitArray{0} = fit_bytearray(this.{0}, {1})'.format(attribute['name'], self._get_type_size(attribute_typedescriptor)))])
                                 self.serialize_method.add_instructions([indent('newArray = concat_typedarrays(newArray, fitArray{})'.format(attribute['name']))])
                             self.serialize_method.add_instructions(['}'])
-                        
+
                         # Single object
                         else:
                             if attribute_typedescriptor['type'] == TypeDescriptorType.Struct.value:
@@ -227,6 +227,7 @@ class JavaScriptGenerator:
 
     def _generate_struct(self, type_descriptor, struct):
         self.new_class = JavaScriptClassGenerator(type_descriptor)
+        self.exports.append(self.new_class.class_signature)
         self.constructor_initial_values = {}
         self._generate_attributes(struct['layout'])
         if self.constructor_initial_values:
@@ -235,43 +236,62 @@ class JavaScriptGenerator:
         self._generate_serialize_method(struct['layout'])
         return self.new_class.get_class()
 
-    def _gengerate_typedarray_concat(self):
-        concat_method = JavaScriptMethodGenerator('concat_typedarrays', ['array1', 'array2'])
-        concat_method.add_instructions([
-            'var newArray = Uint8Array(array1.length + array2.length)',
+    def _gengerate_concat_typedarrays(self):
+        method = JavaScriptMethodGenerator('concat_typedarrays', ['array1', 'array2'])
+        self.exports.append(method.signature)
+        method.add_instructions([
+            'var newArray = new Uint8Array(array1.length + array2.length)',
             'newArray.set(array1)',
             'newArray.set(array2, array1.length)',
             'return newArray',
         ])
-        return concat_method.get_method()
+        return method.get_method()
+
+    def _gengerate_buffer_to_uint(self):
+        method = JavaScriptMethodGenerator('buffer_to_uint', ['buffer'])
+        self.exports.append(method.signature)
+        method.add_instructions([
+            'var dataView = new DataView(buffer)',
+            'if (dataView.byteLength == 1)',
+            indent('return dataView.getUint8(0)'),
+            'if (dataView.byteLength == 2)',
+            indent('return dataView.getUint16(0)'),
+            'if (dataView.byteLength == 4)',
+            indent('return dataView.getUint32(0)'),
+        ])
+        return method.get_method()
 
     def _gengerate_fit_bytearray(self):
-        concat_method = JavaScriptMethodGenerator('fit_bytearray', ['array', 'size'])
-        concat_method.add_instructions([
+        method = JavaScriptMethodGenerator('fit_bytearray', ['array', 'size'])
+        self.exports.append(method.signature)
+        method.add_instructions([
             'if (array == null) {',
             indent('var newArray = new Uint8Array(size)'),
             indent('newArray.fill(0)'),
             indent('return newArray'),
             '}',
             'if (array.length > size) {',
-            indent('throw "Data size larger than allowed"'),
+            indent('throw new RangeError("Data size larger than allowed")'),
             '}',
             'else if (array.length < size) {',
             indent('var newArray = new Uint8Array(size)'),
             indent('newArray.fill(0)'),
             indent('newArray.set(array, size - array.length)'),
-            indent('return new_array'),
+            indent('return newArray'),
             '}',
             'return array',
         ])
-        return concat_method.get_method()
+        return method.get_method()
 
     def _generate_Uint8Array_consumer(self):
         self.consumer_class = JavaScriptClassGenerator('Uint8ArrayConsumable')
         self.consumer_class.add_constructor({'offset': 0, 'binary': 'binary'}, ['binary'])
+        self.exports.append(self.consumer_class.class_signature)
 
         get_bytes_method = JavaScriptMethodGenerator('get_bytes', ['count'])
         get_bytes_method.add_instructions([
+            'if (count + this.offset > this.binary.length)',
+            indent('throw new RangeError()'),
             'var bytes = this.binary.slice(this.offset, this.offset + count)',
             'this.offset += count',
             'return bytes',
@@ -280,12 +300,18 @@ class JavaScriptGenerator:
 
         return self.consumer_class.get_class()
 
+    def _generate_module_exports(self):
+        return ['module.exports = {'] + [indent(export + ',') for export in self.exports] + ['};']
+
     def generate(self):
+        self.exports = []
+
         new_file = ['/*** File automatically generated by Catbuffer ***/', '']
 
-        new_file += self._gengerate_typedarray_concat() + ['']
+        new_file += self._gengerate_concat_typedarrays() + ['']
         new_file += self._gengerate_fit_bytearray() + ['']
         new_file += self._generate_Uint8Array_consumer() + ['']
+        new_file += self._gengerate_buffer_to_uint() + ['']
 
         for type_descriptor, value in self.schema.items():
             if value['type'] == TypeDescriptorType.Byte.value:
@@ -296,5 +322,7 @@ class JavaScriptGenerator:
                 pass
             elif value['type'] == TypeDescriptorType.Struct.value:
                 new_file += self._generate_struct(type_descriptor, value) + ['']
+
+        new_file += self._generate_module_exports() + ['']
 
         return new_file
