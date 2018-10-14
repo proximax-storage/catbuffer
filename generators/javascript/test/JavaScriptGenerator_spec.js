@@ -154,3 +154,44 @@ describe('Uint8ArrayConsumableBuffer class', function () {
         done();
     });
 });
+
+describe('MosaicBuffer generated class', function () {
+    it('has required getters and setters', function(done) {
+        var mosaicBuffer = new GeneratedJs.MosaicBuffer()
+        mosaicBuffer.getMosaicid()
+        mosaicBuffer.setMosaicid(null)
+        mosaicBuffer.getAmount()
+        mosaicBuffer.setAmount(null)
+        done();
+    });
+
+    it('loadFromBinary initializes from binary data', function(done) {
+        var mosaicIdBuffer = Buffer.of(0xF2, 0x26, 0x6C, 0x06, 0x40, 0x83, 0xB2, 0x92)
+        var mosaicAmountBuffer = Buffer.of(0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44)
+        var consumableBuffer = new GeneratedJs.Uint8ArrayConsumableBuffer(Buffer.concat([
+            mosaicIdBuffer,
+            mosaicAmountBuffer,
+        ]))
+        var mosaicBuffer = GeneratedJs.MosaicBuffer.loadFromBinary(consumableBuffer)
+        
+        assert.deepEqual(mosaicBuffer.mosaicId, mosaicIdBuffer)
+        assert.deepEqual(mosaicBuffer.amount, mosaicAmountBuffer)
+        done();
+    });
+
+    it('serialize outputs a valid formatted buffer', function(done) {
+        var mosaicBuffer = new GeneratedJs.MosaicBuffer()
+        var mosaicIdBuffer = Buffer.of(0xF2, 0x26, 0x6C, 0x06, 0x40, 0x83, 0xB2, 0x92)
+        var mosaicAmountBuffer = Buffer.of(0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44)
+        mosaicBuffer.mosaicId = mosaicIdBuffer
+        mosaicBuffer.amount = mosaicAmountBuffer
+
+        var serializedData = mosaicBuffer.serialize()
+        assert.deepEqual(serializedData, Buffer.concat([
+            mosaicIdBuffer,
+            mosaicAmountBuffer,
+        ]))
+
+        done();
+    });
+});

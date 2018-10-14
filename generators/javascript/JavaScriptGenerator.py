@@ -20,7 +20,7 @@ class JavaScriptMethodGenerator:
     def __init__(self, signature, params=[], static=False):
         self.signature = signature
         if static:
-            self.method_output = ['static {}() {{'.format(self.signature, ', '.join(params))]
+            self.method_output = ['static {}({}) {{'.format(self.signature, ', '.join(params))]
         else:
             self.method_output = ['{} = ({}) => {{'.format(self.signature, ', '.join(params))]
 
