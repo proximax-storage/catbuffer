@@ -56,7 +56,7 @@ class JavaScriptClassGenerator:
         self.class_output += new_constructor + [indent('}'), '']
 
     def _add_getter(self, attribute):
-        new_getter = JavaScriptMethodGenerator(JavaScriptClassGenerator.get_generated_getter_signature(attribute), [attribute])
+        new_getter = JavaScriptMethodGenerator(JavaScriptClassGenerator.get_generated_getter_signature(attribute))
         new_getter.add_instructions(['return this.{0}'.format(attribute)])
         self.add_method(new_getter)
 

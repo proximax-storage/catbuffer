@@ -157,11 +157,11 @@ describe('Uint8ArrayConsumableBuffer class', function () {
 
 describe('MosaicBuffer generated class', function () {
     it('has required getters and setters', function(done) {
-        var mosaicBuffer = new GeneratedJs.MosaicBuffer()
-        mosaicBuffer.getMosaicid()
-        mosaicBuffer.setMosaicid(null)
-        mosaicBuffer.getAmount()
-        mosaicBuffer.setAmount(null)
+        var buffer = new GeneratedJs.MosaicBuffer()
+        buffer.getMosaicid()
+        buffer.setMosaicid(null)
+        buffer.getAmount()
+        buffer.setAmount(null)
         done();
     });
 
@@ -192,6 +192,168 @@ describe('MosaicBuffer generated class', function () {
             mosaicAmountBuffer,
         ]))
 
+        done();
+    });
+});
+
+describe('SizePrefixedEntityBuffer generated class', function () {
+    it('has required getters and setters', function(done) {
+        var buffer = new GeneratedJs.SizePrefixedEntityBuffer()
+        buffer.getSize()
+        buffer.setSize(null)
+        done();
+    });
+});
+
+describe('VerifiableEntityBuffer generated class', function () {
+    it('has required getters and setters', function(done) {
+        var buffer = new GeneratedJs.VerifiableEntityBuffer()
+        buffer.getSignature()
+        buffer.setSignature(null)
+        done();
+    });
+});
+
+describe('EntityBodyBuffer generated class', function () {
+    it('has required getters and setters', function(done) {
+        var buffer = new GeneratedJs.EntityBodyBuffer()
+        buffer.getSigner()
+        buffer.setSigner(null)
+        buffer.getVersion()
+        buffer.setVersion(null)
+        buffer.getType()
+        buffer.setType(null)
+        done();
+    });
+});
+
+describe('TransactionBuffer generated class', function () {
+    it('has required getters and setters', function(done) {
+        var buffer = new GeneratedJs.TransactionBuffer()
+        buffer.getSize()
+        buffer.setSize(null)
+        buffer.getSignature()
+        buffer.setSignature(null)
+        buffer.getSigner()
+        buffer.setSigner(null)
+        buffer.getVersion()
+        buffer.setVersion(null)
+        buffer.getType()
+        buffer.setType(null)
+        buffer.getFee()
+        buffer.setFee(null)
+        buffer.getDeadline()
+        buffer.setDeadline(null)
+        done();
+    });
+});
+
+describe('EmbeddedTransactionBuffer generated class', function () {
+    it('has required getters and setters', function(done) {
+        var buffer = new GeneratedJs.EmbeddedTransactionBuffer()
+        buffer.getSize()
+        buffer.setSize(null)
+        buffer.getSigner()
+        buffer.setSigner(null)
+        buffer.getVersion()
+        buffer.setVersion(null)
+        buffer.getType()
+        buffer.setType(null)
+        done();
+    });
+});
+
+describe('TransferTransactionBodyBuffer generated class', function () {
+    it('has required getters and setters', function(done) {
+        var buffer = new GeneratedJs.TransferTransactionBodyBuffer()
+        buffer.getRecipient()
+        buffer.setRecipient(null)
+        buffer.getMessage()
+        buffer.setMessage(null)
+        buffer.getMosaics()
+        buffer.setMosaics(null)
+        done();
+    });
+});
+
+describe('TransferTransactionBuffer generated class', function () {
+    it('has required getters and setters', function(done) {
+        var buffer = new GeneratedJs.TransferTransactionBuffer()
+        buffer.getVersion()
+        buffer.setVersion(null)
+        buffer.setEntitytype(null)
+        buffer.getEntitytype()
+        buffer.setSize(null)
+        buffer.getSize()
+        buffer.setSignature(null)
+        buffer.getSignature()
+        buffer.setSigner(null)
+        buffer.getSigner()
+        buffer.setVersion(null)
+        buffer.getVersion()
+        buffer.setType(null)
+        buffer.getType()
+        buffer.setFee(null)
+        buffer.getFee()
+        buffer.setDeadline(null)
+        buffer.getDeadline()
+        buffer.setRecipient(null)
+        buffer.getRecipient()
+        buffer.setMessage(null)
+        buffer.getMessage()
+        buffer.setMosaics(null)
+        buffer.getMosaics()
+        done();
+    });
+});
+
+describe('EmbeddedTransferTransactionBuffer generated class', function () {
+    it('has required getters and setters', function(done) {
+        var buffer = new GeneratedJs.EmbeddedTransferTransactionBuffer()
+        buffer.getSize()
+        buffer.setSize(null)
+        buffer.getSigner()
+        buffer.setSigner(null)
+        buffer.getVersion()
+        buffer.setVersion(null)
+        buffer.getType()
+        buffer.setType(null)
+        buffer.getRecipient()
+        buffer.setRecipient(null)
+        buffer.getMessage()
+        buffer.setMessage(null)
+        buffer.getMosaics()
+        buffer.setMosaics(null)
+        done();
+    });
+});
+
+describe('SizePrefixedEntityBuffer generated class', function () {
+    it('has required getters and setters', function(done) {
+        var buffer = new GeneratedJs.SizePrefixedEntityBuffer()
+        buffer.getSize()
+        buffer.setSize(null)
+        buffer.getSize()
+        buffer.setSize(null)
+        buffer.getSize()
+        buffer.setSize(null)
+        buffer.getSize()
+        buffer.setSize(null)
+        done();
+    });
+});
+
+describe('SizePrefixedEntityBuffer generated class', function () {
+    it('has required getters and setters', function(done) {
+        var buffer = new GeneratedJs.SizePrefixedEntityBuffer()
+        buffer.getSize()
+        buffer.setSize(null)
+        buffer.getSize()
+        buffer.setSize(null)
+        buffer.getSize()
+        buffer.setSize(null)
+        buffer.getSize()
+        buffer.setSize(null)
         done();
     });
 });
