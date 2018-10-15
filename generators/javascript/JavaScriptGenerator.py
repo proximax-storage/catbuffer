@@ -93,7 +93,7 @@ class JavaScriptGenerator:
         return Descriptor('catbuffer_generated_output.js', code)
 
     def _get_type_size(self, attribute):
-        if attribute['type'] != 'byte':
+        if attribute['type'] != TypeDescriptorType.Byte.value and attribute['type'] != TypeDescriptorType.Enum.value:
             return self.schema[attribute['type']]['size']
         return attribute['size']
 
@@ -139,7 +139,7 @@ class JavaScriptGenerator:
                             self.load_from_binary_method.add_instructions(['for (i = 0; i < {}; i++) {{'.format(attribute['size'])])
                             if attribute_typedescriptor['type'] == TypeDescriptorType.Struct.value:
                                 self.load_from_binary_method.add_instructions([indent('var new{0} = {1}.loadFromBinary(consumableBuffer)'.format(attribute['name'], JavaScriptClassGenerator.get_generated_class_signature(attribute['type'])))])
-                            elif attribute_typedescriptor['type'] == TypeDescriptorType.Byte.value:
+                            elif attribute_typedescriptor['type'] == TypeDescriptorType.Byte.value or attribute_typedescriptor['type'] == TypeDescriptorType.Enum.value:
                                 self.load_from_binary_method.add_instructions([indent('var new{0} = consumableBuffer.get_bytes({1})'.format(attribute['name'], self._get_type_size(attribute_typedescriptor)))])
                             self.load_from_binary_method.add_instructions([indent('object.{0}.push(new{0})'.format(attribute['name']))])
                             self.load_from_binary_method.add_instructions(['}'])
@@ -148,7 +148,7 @@ class JavaScriptGenerator:
                         else:
                             if attribute_typedescriptor['type'] == TypeDescriptorType.Struct.value:
                                 self.load_from_binary_method.add_instructions(['var {0} = {1}.loadFromBinary(consumableBuffer)'.format(attribute['name'], JavaScriptClassGenerator.get_generated_class_signature(attribute['type']))])
-                            elif attribute_typedescriptor['type'] == TypeDescriptorType.Byte.value:
+                            elif attribute_typedescriptor['type'] == TypeDescriptorType.Byte.value or attribute_typedescriptor['type'] == TypeDescriptorType.Enum.value:
                                 self.load_from_binary_method.add_instructions(['var {0} = consumableBuffer.get_bytes({1})'.format(attribute['name'], self._get_type_size(attribute_typedescriptor))])
                             self.load_from_binary_method.add_instructions(['object.{0} = {0}'.format(attribute['name'])])
 
@@ -192,7 +192,7 @@ class JavaScriptGenerator:
                             self.serialize_method.add_instructions(['for (element in this.{}) {{'.format(attribute['name'])])
                             if attribute_typedescriptor['type'] == TypeDescriptorType.Struct.value:
                                 self.serialize_method.add_instructions([indent('newArray = concat_typedarrays(newArray, element.serialize())')])
-                            elif attribute_typedescriptor['type'] == TypeDescriptorType.Byte.value:
+                            elif attribute_typedescriptor['type'] == TypeDescriptorType.Byte.value or attribute_typedescriptor['type'] == TypeDescriptorType.Enum.value:
                                 self.serialize_method.add_instructions([indent('var fitArray{0} = fit_bytearray(this.{0}, {1})'.format(attribute['name'], self._get_type_size(attribute_typedescriptor)))])
                                 self.serialize_method.add_instructions([indent('newArray = concat_typedarrays(newArray, fitArray{})'.format(attribute['name']))])
                             self.serialize_method.add_instructions(['}'])
@@ -201,7 +201,7 @@ class JavaScriptGenerator:
                         else:
                             if attribute_typedescriptor['type'] == TypeDescriptorType.Struct.value:
                                 self.serialize_method.add_instructions(['newArray = concat_typedarrays(newArray, this.{}.serialize())'.format(attribute['name'])])
-                            elif attribute_typedescriptor['type'] == TypeDescriptorType.Byte.value:
+                            elif attribute_typedescriptor['type'] == TypeDescriptorType.Byte.value or attribute_typedescriptor['type'] == TypeDescriptorType.Enum.value:
                                 self.serialize_method.add_instructions(['var fitArray{0} = fit_bytearray(this.{0}, {1})'.format(attribute['name'], self._get_type_size(attribute_typedescriptor))])
                                 self.serialize_method.add_instructions(['newArray = concat_typedarrays(newArray, fitArray{})'.format(attribute['name'])])
 
@@ -218,7 +218,8 @@ class JavaScriptGenerator:
                 if attribute['disposition'] == TypeDescriptorDisposition.Inline.value:
                     self._generate_attributes(self.schema[attribute['type']]['layout'])
                 elif attribute['disposition'] == TypeDescriptorDisposition.Const.value:
-                    self.constructor_initial_values[attribute['name']] = attribute['value']
+                    # Const only supporting types of uint8, uint16 and uint32 (size 1, 2, 4 bytes)
+                    self.constructor_initial_values[attribute['name']] = 'uint_to_buffer({0}, {1})'.format(attribute['value'], self._get_type_size(attribute))
                     if self._get_attribute_name_if_sizeof(attribute['name'], attributes) is None:
                         self.new_class.add_getter_setter(attribute['name'])
             else:
@@ -254,10 +255,26 @@ class JavaScriptGenerator:
             'var dataView = new DataView(buffer)',
             'if (dataView.byteLength == 1)',
             indent('return dataView.getUint8(0)'),
-            'if (dataView.byteLength == 2)',
+            'else if (dataView.byteLength == 2)',
             indent('return dataView.getUint16(0)'),
-            'if (dataView.byteLength == 4)',
+            'else if (dataView.byteLength == 4)',
             indent('return dataView.getUint32(0)'),
+        ])
+        return method.get_method()
+
+    def _gengerate_uint_to_buffer(self):
+        method = JavaScriptMethodGenerator('uint_to_buffer', ['uint', 'bufferSize'])
+        self.exports.append(method.signature)
+        method.add_instructions([
+            'var buffer = new ArrayBuffer(bufferSize)',
+            'var dataView = new DataView(buffer)',
+            'if (bufferSize == 1)',
+            indent('dataView.setUint8(0, uint)'),
+            'else if (bufferSize == 2)',
+            indent('dataView.setUint16(0, uint)'),
+            'else if (bufferSize == 4)',
+            indent('dataView.setUint32(0, uint)'),
+            'return new Uint8Array(buffer)',
         ])
         return method.get_method()
 
@@ -312,6 +329,7 @@ class JavaScriptGenerator:
         new_file += self._gengerate_fit_bytearray() + ['']
         new_file += self._generate_Uint8Array_consumer() + ['']
         new_file += self._gengerate_buffer_to_uint() + ['']
+        new_file += self._gengerate_uint_to_buffer() + ['']
 
         for type_descriptor, value in self.schema.items():
             if value['type'] == TypeDescriptorType.Byte.value:
