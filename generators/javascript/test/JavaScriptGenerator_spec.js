@@ -8,12 +8,12 @@ describe('buffer_to_uint function', function () {
         var array8 = new ArrayBuffer(1)
         var array8DataView = new DataView(array8)
 
-        array8DataView.setUint8(0, int8)
-        var int = GeneratedJs.buffer_to_uint(array8)
+        array8DataView.setUint8(0, int8, true)
+        var int = GeneratedJs.buffer_to_uint(new Uint8Array(array8))
         assert.equal(int, int8)
 
-        array8DataView.setUint8(0, 0)
-        var int = GeneratedJs.buffer_to_uint(array8)
+        array8DataView.setUint8(0, 0, true)
+        var int = GeneratedJs.buffer_to_uint(new Uint8Array(array8))
         assert.equal(int, 0)
 
         done()
@@ -24,12 +24,12 @@ describe('buffer_to_uint function', function () {
         var array16 = new ArrayBuffer(2)
         var array16DataView = new DataView(array16)
 
-        array16DataView.setUint16(0, int16)
-        var int = GeneratedJs.buffer_to_uint(array16)
+        array16DataView.setUint16(0, int16, true)
+        var int = GeneratedJs.buffer_to_uint(new Uint8Array(array16))
         assert.equal(int, int16)
 
-        array16DataView.setUint16(0, 0)
-        var int = GeneratedJs.buffer_to_uint(array16)
+        array16DataView.setUint16(0, 0, true)
+        var int = GeneratedJs.buffer_to_uint(new Uint8Array(array16))
         assert.equal(int, 0)
 
         done()
@@ -40,12 +40,12 @@ describe('buffer_to_uint function', function () {
         var array32 = new ArrayBuffer(4)
         var array32DataView = new DataView(array32)
         
-        array32DataView.setUint32(0, int32)
-        var int = GeneratedJs.buffer_to_uint(array32)
+        array32DataView.setUint32(0, int32, true)
+        var int = GeneratedJs.buffer_to_uint(new Uint8Array(array32))
         assert.equal(int, int32)
 
-        array32DataView.setUint32(0, 0)
-        var int = GeneratedJs.buffer_to_uint(array32)
+        array32DataView.setUint32(0, 0, true)
+        var int = GeneratedJs.buffer_to_uint(new Uint8Array(array32))
         assert.equal(int, 0)
 
         done()
@@ -65,7 +65,7 @@ describe('uint_to_buffer function', function () {
         var int16 = 54346
         var buffer = GeneratedJs.uint_to_buffer(int16, 2)
         assert.equal(buffer.byteLength, 2)
-        assert.deepEqual(buffer, [212, 74])
+        assert.deepEqual(buffer, [74, 212])
         done()
     })
 
@@ -73,7 +73,7 @@ describe('uint_to_buffer function', function () {
         var int32 = 765436
         var buffer = GeneratedJs.uint_to_buffer(int32, 4)
         assert.equal(buffer.byteLength, 4)
-        assert.deepEqual(buffer, [0, 11, 173, 252])
+        assert.deepEqual(buffer, [252, 173, 11, 0])
         done()
     })
 })
@@ -194,14 +194,15 @@ describe('MosaicBuffer generated class', function () {
     it('loadFromBinary initializes from binary data', function(done) {
         var mosaicIdBuffer = Buffer.of(0xF2, 0x26, 0x6C, 0x06, 0x40, 0x83, 0xB2, 0x92)
         var mosaicAmountBuffer = Buffer.of(0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44)
-        var consumableBuffer = new GeneratedJs.Uint8ArrayConsumableBuffer(Buffer.concat([
+        var consumableBuffer = new GeneratedJs.Uint8ArrayConsumableBuffer(new Uint8Array(Buffer.concat([
             mosaicIdBuffer,
             mosaicAmountBuffer,
-        ]))
+        ])))
         var mosaicBuffer = GeneratedJs.MosaicBuffer.loadFromBinary(consumableBuffer)
         
         assert.deepEqual(mosaicBuffer.mosaicId, mosaicIdBuffer)
         assert.deepEqual(mosaicBuffer.amount, mosaicAmountBuffer)
+        assert.equal(consumableBuffer.binary.length, consumableBuffer.offset)
         done()
     })
 
@@ -236,6 +237,7 @@ describe('SizePrefixedEntityBuffer generated class', function () {
         var buffer = GeneratedJs.SizePrefixedEntityBuffer.loadFromBinary(consumableBuffer)
         
         assert.deepEqual(buffer.size, sizeBuffer)
+        assert.equal(consumableBuffer.binary.length, consumableBuffer.offset)
         done()
     })
 
@@ -276,6 +278,7 @@ describe('VerifiableEntityBuffer generated class', function () {
         var buffer = GeneratedJs.VerifiableEntityBuffer.loadFromBinary(consumableBuffer)
         
         assert.deepEqual(buffer.signature, signatureBuffer)
+        assert.equal(consumableBuffer.binary.length, consumableBuffer.offset)
         done()
     })
 })
@@ -299,16 +302,17 @@ describe('EntityBodyBuffer generated class', function () {
         )
         var versionBuffer = Buffer.of(0xF2, 0x26)
         var typeBuffer = Buffer.of(0xFF, 0x34)
-        var consumableBuffer = new GeneratedJs.Uint8ArrayConsumableBuffer(Buffer.concat([
+        var consumableBuffer = new GeneratedJs.Uint8ArrayConsumableBuffer(new Uint8Array(Buffer.concat([
             signerBuffer,
             versionBuffer,
             typeBuffer,
-        ]))
+        ])))
         var buffer = GeneratedJs.EntityBodyBuffer.loadFromBinary(consumableBuffer)
         
         assert.deepEqual(buffer.signer, signerBuffer)
         assert.deepEqual(buffer.version, versionBuffer)
         assert.deepEqual(buffer.type, typeBuffer)
+        assert.equal(consumableBuffer.binary.length, consumableBuffer.offset)
         done()
     })
 })
@@ -349,7 +353,7 @@ describe('TransactionBuffer generated class', function () {
         var typeBuffer = Buffer.of(0x22, 0x66)
         var feeBuffer = Buffer.of(0xB6, 0x05, 0xDC, 0x0C, 0x4C, 0xF7, 0xF2, 0x06)
         var deadlineBuffer = Buffer.of(0xF2, 0x26, 0x0C, 0x4C, 0xF7, 0xF1, 0x6C, 0x06)
-        var consumableBuffer = new GeneratedJs.Uint8ArrayConsumableBuffer(Buffer.concat([
+        var consumableBuffer = new GeneratedJs.Uint8ArrayConsumableBuffer(new Uint8Array(Buffer.concat([
             sizeBuffer,
             signatureBuffer,
             signerBuffer,
@@ -357,7 +361,7 @@ describe('TransactionBuffer generated class', function () {
             typeBuffer,
             feeBuffer,
             deadlineBuffer,
-        ]))
+        ])))
         var buffer = GeneratedJs.TransactionBuffer.loadFromBinary(consumableBuffer)
         
         assert.deepEqual(buffer.size, sizeBuffer)
@@ -367,6 +371,7 @@ describe('TransactionBuffer generated class', function () {
         assert.deepEqual(buffer.type, typeBuffer)
         assert.deepEqual(buffer.fee, feeBuffer)
         assert.deepEqual(buffer.deadline, deadlineBuffer)
+        assert.equal(consumableBuffer.binary.length, consumableBuffer.offset)
         done()
     })
 })
@@ -393,18 +398,19 @@ describe('EmbeddedTransactionBuffer generated class', function () {
         )
         var versionBuffer = Buffer.of(0xFF, 0x36)
         var typeBuffer = Buffer.of(0x22, 0x66)
-        var consumableBuffer = new GeneratedJs.Uint8ArrayConsumableBuffer(Buffer.concat([
+        var consumableBuffer = new GeneratedJs.Uint8ArrayConsumableBuffer(new Uint8Array(Buffer.concat([
             sizeBuffer,
             signerBuffer,
             versionBuffer,
             typeBuffer,
-        ]))
+        ])))
         var buffer = GeneratedJs.EmbeddedTransactionBuffer.loadFromBinary(consumableBuffer)
         
         assert.deepEqual(buffer.size, sizeBuffer)
         assert.deepEqual(buffer.signer, signerBuffer)
         assert.deepEqual(buffer.version, versionBuffer)
         assert.deepEqual(buffer.type, typeBuffer)
+        assert.equal(consumableBuffer.binary.length, consumableBuffer.offset)
         done()
     })
 })
@@ -422,15 +428,48 @@ describe('TransferTransactionBodyBuffer generated class', function () {
     })
 
     it('loadFromBinary initializes from binary data', function(done) {
-        var sizeBuffer = Buffer.of(0xF2, 0x26, 0x6C, 0x06)
-        var consumableBuffer = new GeneratedJs.Uint8ArrayConsumableBuffer(Buffer.concat([
-            signerBuffer,
-            versionBuffer,
-            typeBuffer,
-        ]))
+        var mosaicBuffer1 = new GeneratedJs.MosaicBuffer()
+        mosaicBuffer1.mosaicId = new Uint8Array(Buffer.of(0xF2, 0x26, 0x6C, 0x06, 0x40, 0x83, 0xB2, 0x92))
+        mosaicBuffer1.amount = new Uint8Array(Buffer.of(0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44))
+        var mosaicBuffer2 = new GeneratedJs.MosaicBuffer()
+        var mosaic1 = mosaicBuffer1.serialize()
+        mosaicBuffer2.mosaicId = new Uint8Array(Buffer.of(0xF2, 0x26, 0x6C, 0x06, 0x40, 0x83, 0xB2, 0x92))
+        mosaicBuffer2.amount = new Uint8Array(Buffer.of(0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44))
+        var mosaic2 = mosaicBuffer2.serialize()
+
+        var recipientBuffer = Buffer.of(
+            0x3E, 0xE9, 0xFA, 0x15, 0xA3, 0xB6, 0x05, 0xDC, 0x0C, 0x4C, 0xF7, 0xF1, 0xB1, 0x5A, 0xAB, 0xDC,
+            0xCC, 0x2E, 0x09, 0x59, 0x38, 0x97, 0xF2, 0x69, 0xD9
+        )
+        var messageSizeBuffer = Buffer.of(0x35, 0x00)
+        var mosaicsCountBuffer = Buffer.of(0x02)
+        var messageBuffer = Buffer.of(
+            0xE8, 0x34, 0x62, 0x6D, 0x00, 0x3C, 0xBF, 0xC2, 0x18, 0x0D, 0x71, 0xED, 0x25, 0x72, 0x3F, 0x48,
+            0x3E, 0xE9, 0xFA, 0x15, 0xA3, 0xB6, 0x05, 0xDC, 0x0C, 0x4C, 0xF7, 0xF1, 0xB1, 0x5A, 0xAB, 0xDC,
+            0xCC, 0x2E, 0x09, 0x59, 0x38, 0x97, 0xF2, 0x69, 0xD9, 0xE2, 0x56, 0x29, 0x2B, 0xF3, 0x52, 0xC0,
+            0xAA, 0xBB, 0x55, 0xFF, 0x44
+        )
+        var mosaicsBuffer = Buffer.concat([
+            mosaic1,
+            mosaic2,
+        ])
+        var consumableBuffer = new GeneratedJs.Uint8ArrayConsumableBuffer(new Uint8Array(Buffer.concat([
+            recipientBuffer,
+            messageSizeBuffer,
+            mosaicsCountBuffer,
+            messageBuffer,
+            mosaicsBuffer,
+        ])))
+
         var buffer = GeneratedJs.TransferTransactionBodyBuffer.loadFromBinary(consumableBuffer)
         
-        assert.deepEqual(buffer.size, sizeBuffer)
+        assert.deepEqual(buffer.recipient, recipientBuffer)
+        assert.deepEqual(buffer.message.length, 53)
+        assert.deepEqual(buffer.message, messageBuffer)
+        assert.deepEqual(buffer.mosaics.length, 2)
+        assert.deepEqual(buffer.mosaics[0].serialize(), mosaic1)
+        assert.deepEqual(buffer.mosaics[1].serialize(), mosaic2)
+        assert.equal(consumableBuffer.binary.length, consumableBuffer.offset)
         done()
     })
 })
@@ -468,11 +507,11 @@ describe('TransferTransactionBuffer generated class', function () {
     it('initializes with valid default values', function(done) {
         var versionBuffer = new ArrayBuffer(1)
         var dataView = new DataView(versionBuffer)
-        dataView.setUint8(0, 3)
+        dataView.setUint8(0, 3, true)
         
         var entityTypeBuffer = new ArrayBuffer(2)
         var dataView2 = new DataView(entityTypeBuffer)
-        dataView2.setUint16(0, 16724)
+        dataView2.setUint16(0, 16724, true)
 
         var buffer = new GeneratedJs.TransferTransactionBuffer()
         assert.deepEqual(buffer.version, new Uint8Array(versionBuffer))
@@ -482,15 +521,60 @@ describe('TransferTransactionBuffer generated class', function () {
     })
 
     it('loadFromBinary initializes from binary data', function(done) {
+        var entityTypeBuffer = Buffer.of(0xCC, 0xBB)
         var sizeBuffer = Buffer.of(0xF2, 0x26, 0x6C, 0x06)
-        var consumableBuffer = new GeneratedJs.Uint8ArrayConsumableBuffer(Buffer.concat([
+        var signatureBuffer = Buffer.of(
+                0xF5, 0x24, 0x8C, 0xB0, 0x05, 0x49, 0xC6, 0x15, 0xFC, 0x56, 0x13, 0x08, 0xE3, 0x4B, 0x60, 0xFF,
+                0x3E, 0xE9, 0xFA, 0x15, 0xA3, 0xB6, 0x05, 0xDC, 0x0C, 0x4C, 0xF7, 0xF1, 0xB1, 0x5A, 0xAB, 0xDC,
+                0xCC, 0x2E, 0x09, 0x59, 0x38, 0x97, 0xF2, 0x69, 0xD9, 0xE2, 0x56, 0x29, 0x2B, 0xF3, 0x52, 0xC0,
+                0xE8, 0x34, 0x62, 0x6D, 0x00, 0x3C, 0xBF, 0xC2, 0x18, 0x0D, 0x71, 0xED, 0x25, 0x72, 0x3F, 0x48
+        )
+        var signerBuffer = Buffer.of(
+                0x3E, 0xE9, 0xFA, 0x15, 0xA3, 0xB6, 0x05, 0xDC, 0x0C, 0x4C, 0xF7, 0xF1, 0xB1, 0x5A, 0xAB, 0xDC,
+                0xE8, 0x34, 0x62, 0x6D, 0x00, 0x3C, 0xBF, 0xC2, 0x18, 0x0D, 0x71, 0xED, 0x25, 0x72, 0x3F, 0x48
+        )
+        var versionBuffer = Buffer.of(0xFF, 0x36)
+        var typeBuffer = Buffer.of(0x22, 0x66)
+        var feeBuffer = Buffer.of(0xB6, 0x05, 0xDC, 0x0C, 0x4C, 0xF7, 0xF2, 0x06)
+        var deadlineBuffer = Buffer.of(0xF2, 0x26, 0x0C, 0x4C, 0xF7, 0xF1, 0x6C, 0x06)
+        var recipientBuffer = Buffer.of(
+            0x3E, 0xE9, 0xFA, 0x15, 0xA3, 0xB6, 0x05, 0xDC, 0x0C, 0x4C, 0xF7, 0xF1, 0xB1, 0x5A, 0xAB, 0xDC,
+            0xCC, 0x2E, 0x09, 0x59, 0x38, 0x97, 0xF2, 0x69, 0xD9
+        )
+        var messageSizeBuffer = Buffer.of(0x12, 0x00)
+        var mosaicsCountBuffer = Buffer.of(0x02)
+        var messageBuffer = Buffer.of(0x05, 0xDC)
+        var mosaicsBuffer = Buffer.of(0x66)
+        var consumableBuffer = new GeneratedJs.Uint8ArrayConsumableBuffer(new Uint8Array(Buffer.concat([
+            // Buffer.of(0xCC), # Version (FIXME ?)
+            entityTypeBuffer,
+            sizeBuffer,
+            signatureBuffer,
             signerBuffer,
             versionBuffer,
             typeBuffer,
-        ]))
+            feeBuffer,
+            deadlineBuffer,
+            recipientBuffer,
+            messageSizeBuffer,
+            mosaicsCountBuffer,
+            messageBuffer,
+            mosaicsBuffer,
+        ])))
         var buffer = GeneratedJs.TransferTransactionBuffer.loadFromBinary(consumableBuffer)
         
+        assert.deepEqual(buffer.entityType, entityTypeBuffer)
         assert.deepEqual(buffer.size, sizeBuffer)
+        assert.deepEqual(buffer.signature, signatureBuffer)
+        assert.deepEqual(buffer.signer, signerBuffer)
+        assert.deepEqual(buffer.version, versionBuffer)
+        assert.deepEqual(buffer.type, typeBuffer)
+        assert.deepEqual(buffer.fee, feeBuffer)
+        assert.deepEqual(buffer.deadline, deadlineBuffer)
+        assert.deepEqual(buffer.recipient, recipientBuffer)
+        assert.deepEqual(buffer.message, messageBuffer) // Array (FIXME?)
+        assert.deepEqual(buffer.mosaics, mosaicsBuffer) // Array
+        assert.equal(consumableBuffer.binary.length, consumableBuffer.offset)
         done()
     })
 })
@@ -517,14 +601,15 @@ describe('EmbeddedTransferTransactionBuffer generated class', function () {
 
     it('loadFromBinary initializes from binary data', function(done) {
         var sizeBuffer = Buffer.of(0xF2, 0x26, 0x6C, 0x06)
-        var consumableBuffer = new GeneratedJs.Uint8ArrayConsumableBuffer(Buffer.concat([
+        var consumableBuffer = new GeneratedJs.Uint8ArrayConsumableBuffer(new Uint8Array(Buffer.concat([
             signerBuffer,
             versionBuffer,
             typeBuffer,
-        ]))
+        ])))
         var buffer = GeneratedJs.EmbeddedTransferTransactionBuffer.loadFromBinary(consumableBuffer)
         
         assert.deepEqual(buffer.size, sizeBuffer)
+        assert.equal(consumableBuffer.binary.length, consumableBuffer.offset)
         done()
     })
 })

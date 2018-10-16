@@ -103,7 +103,6 @@ class JavaScriptGenerator:
                 return attribute['name']
 
     def _generate_load_from_binary_attributes(self, attributes):
-        context = {}  # Stores meta size information for dynamic length attributes
         for attribute in attributes:
             if 'disposition' in attribute:
                 if attribute['disposition'] == TypeDescriptorDisposition.Inline.value:
@@ -114,18 +113,11 @@ class JavaScriptGenerator:
             else:
                 sizeof_attribute_name = self._get_attribute_name_if_sizeof(attribute['name'], attributes)
                 if sizeof_attribute_name is not None:
-                    self.load_from_binary_method.add_instructions(['var {0} = buffer_to_int(consumableBuffer.get_bytes({1}))'.format(attribute['name'], attribute['size'])])
-                    context[attribute['name']] = attribute['size']
+                    self.load_from_binary_method.add_instructions(['var {0} = buffer_to_uint(consumableBuffer.get_bytes({1}))'.format(attribute['name'], attribute['size'])])
                 else:
                     if attribute['type'] == TypeDescriptorType.Byte.value:
-                        if isinstance(attribute['size'], int):
-                            self.load_from_binary_method.add_instructions(['var {0} = consumableBuffer.get_bytes({1})'.format(attribute['name'], self._get_type_size(attribute))])
-                            self.load_from_binary_method.add_instructions(['object.{0} = {0}'.format(attribute['name'])])
-                        else:
-                            self.load_from_binary_method.add_instructions(['var {} = []'.format(attribute['name'])])
-                            self.load_from_binary_method.add_instructions(['for (i = 0; i < {0}; i++) {{'.format(attribute['size'])])
-                            self.load_from_binary_method.add_instructions([indent('{0}.push(consumableBuffer.get_bytes({1}))'.format(attribute['name'], context[attribute['size']]))])
-                            self.load_from_binary_method.add_instructions(['}', 'object.{0} = {0}'.format(attribute['name'])])
+                        self.load_from_binary_method.add_instructions(['var {0} = consumableBuffer.get_bytes({1})'.format(attribute['name'], self._get_type_size(attribute))])
+                        self.load_from_binary_method.add_instructions(['object.{0} = {0}'.format(attribute['name'])])
 
                     # Struct object
                     else:
@@ -136,7 +128,7 @@ class JavaScriptGenerator:
                         if 'size' in attribute:
                             # No need to check if attribute['size'] is int (fixed) or a variable reference, because attribute['size'] will either be a number or a previously code generated reference
                             self.load_from_binary_method.add_instructions(['object.{} = []'.format(attribute['name'])])
-                            self.load_from_binary_method.add_instructions(['for (i = 0; i < {}; i++) {{'.format(attribute['size'])])
+                            self.load_from_binary_method.add_instructions(['var i', 'for (i = 0; i < {}; i++) {{'.format(attribute['size'])])
                             if attribute_typedescriptor['type'] == TypeDescriptorType.Struct.value:
                                 self.load_from_binary_method.add_instructions([indent('var new{0} = {1}.loadFromBinary(consumableBuffer)'.format(attribute['name'], JavaScriptClassGenerator.get_generated_class_signature(attribute['type'])))])
                             elif attribute_typedescriptor['type'] == TypeDescriptorType.Byte.value or attribute_typedescriptor['type'] == TypeDescriptorType.Enum.value:
@@ -252,13 +244,13 @@ class JavaScriptGenerator:
         method = JavaScriptMethodGenerator('buffer_to_uint', ['buffer'])
         self.exports.append(method.signature)
         method.add_instructions([
-            'var dataView = new DataView(buffer)',
-            'if (dataView.byteLength == 1)',
-            indent('return dataView.getUint8(0)'),
-            'else if (dataView.byteLength == 2)',
-            indent('return dataView.getUint16(0)'),
-            'else if (dataView.byteLength == 4)',
-            indent('return dataView.getUint32(0)'),
+            'var dataView = new DataView(buffer.buffer)',
+            'if (buffer.byteLength == 1)',
+            indent('return dataView.getUint8(0, true)'),
+            'else if (buffer.byteLength == 2)',
+            indent('return dataView.getUint16(0, true)'),
+            'else if (buffer.byteLength == 4)',
+            indent('return dataView.getUint32(0, true)'),
         ])
         return method.get_method()
 
@@ -269,11 +261,11 @@ class JavaScriptGenerator:
             'var buffer = new ArrayBuffer(bufferSize)',
             'var dataView = new DataView(buffer)',
             'if (bufferSize == 1)',
-            indent('dataView.setUint8(0, uint)'),
+            indent('dataView.setUint8(0, uint, true)'),
             'else if (bufferSize == 2)',
-            indent('dataView.setUint16(0, uint)'),
+            indent('dataView.setUint16(0, uint, true)'),
             'else if (bufferSize == 4)',
-            indent('dataView.setUint32(0, uint)'),
+            indent('dataView.setUint32(0, uint, true)'),
             'return new Uint8Array(buffer)',
         ])
         return method.get_method()
