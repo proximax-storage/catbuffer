@@ -17,12 +17,12 @@ def indent(code, n_indents=1):
 
 
 class JavaScriptMethodGenerator:
-    def __init__(self, signature, params=[], static=False):
-        self.signature = signature
+    def __init__(self, name, params=[], static=False):
+        self.name = name
         if static:
-            self.method_output = ['static {}({}) {{'.format(self.signature, ', '.join(params))]
+            self.method_output = ['static {}({}) {{'.format(self.name, ', '.join(params))]
         else:
-            self.method_output = ['{} = ({}) => {{'.format(self.signature, ', '.join(params))]
+            self.method_output = ['{} = ({}) => {{'.format(self.name, ', '.join(params))]
 
     def add_instructions(self, instructions):
         for instruction in instructions:
@@ -34,20 +34,20 @@ class JavaScriptMethodGenerator:
 
 class JavaScriptClassGenerator:
     @staticmethod
-    def get_generated_class_signature(signature):
-        return '{}Buffer'.format(signature)
+    def get_generated_class_name(name):
+        return '{}Buffer'.format(name)
 
     @staticmethod
-    def get_generated_getter_signature(attribute):
+    def get_generated_getter_name(attribute):
         return 'get{}'.format(attribute.capitalize())
 
     @staticmethod
-    def get_generated_setter_signature(attribute):
+    def get_generated_setter_name(attribute):
         return 'set{}'.format(attribute.capitalize())
 
-    def __init__(self, signature):
-        self.class_signature = JavaScriptClassGenerator.get_generated_class_signature(signature)
-        self.class_output = ['class {} {{'.format(self.class_signature)]
+    def __init__(self, name):
+        self.class_name = JavaScriptClassGenerator.get_generated_class_name(name)
+        self.class_output = ['class {} {{'.format(self.class_name)]
 
     def add_constructor(self, initial_values, params=[]):
         new_constructor = [indent('constructor({}) {{'.format(', '.join(params)))]
@@ -56,12 +56,12 @@ class JavaScriptClassGenerator:
         self.class_output += new_constructor + [indent('}'), '']
 
     def _add_getter(self, attribute):
-        new_getter = JavaScriptMethodGenerator(JavaScriptClassGenerator.get_generated_getter_signature(attribute))
+        new_getter = JavaScriptMethodGenerator(JavaScriptClassGenerator.get_generated_getter_name(attribute))
         new_getter.add_instructions(['return this.{0}'.format(attribute)])
         self.add_method(new_getter)
 
     def _add_setter(self, attribute):
-        new_setter = JavaScriptMethodGenerator(JavaScriptClassGenerator.get_generated_setter_signature(attribute), [attribute])
+        new_setter = JavaScriptMethodGenerator(JavaScriptClassGenerator.get_generated_setter_name(attribute), [attribute])
         new_setter.add_instructions(['this.{0} = {0}'.format(attribute)])
         self.add_method(new_setter)
 
@@ -101,6 +101,7 @@ class JavaScriptGenerator:
         for attribute in attributes:
             if 'size' in attribute and attribute['size'] == attribute_name:
                 return attribute['name']
+        return None
 
     def _generate_load_from_binary_attributes(self, attributes):
         for attribute in attributes:
@@ -129,7 +130,7 @@ class JavaScriptGenerator:
                             self.load_from_binary_method.add_instructions(['object.{} = []'.format(attribute['name'])])
                             self.load_from_binary_method.add_instructions(['var i', 'for (i = 0; i < {}; i++) {{'.format(attribute['size'])])
                             if attribute_typedescriptor['type'] == TypeDescriptorType.Struct.value:
-                                self.load_from_binary_method.add_instructions([indent('var new{0} = {1}.loadFromBinary(consumableBuffer)'.format(attribute['name'], JavaScriptClassGenerator.get_generated_class_signature(attribute['type'])))])
+                                self.load_from_binary_method.add_instructions([indent('var new{0} = {1}.loadFromBinary(consumableBuffer)'.format(attribute['name'], JavaScriptClassGenerator.get_generated_class_name(attribute['type'])))])
                             elif attribute_typedescriptor['type'] == TypeDescriptorType.Enum.value:
                                 self.load_from_binary_method.add_instructions([indent('var new{0} = consumableBuffer.get_bytes({1})'.format(attribute['name'], self._get_type_size(attribute_typedescriptor)))])
                             self.load_from_binary_method.add_instructions([indent('object.{0}.push(new{0})'.format(attribute['name']))])
@@ -138,14 +139,14 @@ class JavaScriptGenerator:
                         # Single object
                         else:
                             if attribute_typedescriptor['type'] == TypeDescriptorType.Struct.value:
-                                self.load_from_binary_method.add_instructions(['var {0} = {1}.loadFromBinary(consumableBuffer)'.format(attribute['name'], JavaScriptClassGenerator.get_generated_class_signature(attribute['type']))])
+                                self.load_from_binary_method.add_instructions(['var {0} = {1}.loadFromBinary(consumableBuffer)'.format(attribute['name'], JavaScriptClassGenerator.get_generated_class_name(attribute['type']))])
                             elif attribute_typedescriptor['type'] == TypeDescriptorType.Byte.value or attribute_typedescriptor['type'] == TypeDescriptorType.Enum.value:
                                 self.load_from_binary_method.add_instructions(['var {0} = consumableBuffer.get_bytes({1})'.format(attribute['name'], self._get_type_size(attribute_typedescriptor))])
                             self.load_from_binary_method.add_instructions(['object.{0} = {0}'.format(attribute['name'])])
 
     def _generate_load_from_binary_method(self, attributes):
         self.load_from_binary_method = JavaScriptMethodGenerator('loadFromBinary', ['consumableBuffer'], True)
-        self.load_from_binary_method.add_instructions(['var object = new {}()'.format(self.new_class.class_signature)])
+        self.load_from_binary_method.add_instructions(['var object = new {}()'.format(self.new_class.class_name)])
         self._generate_load_from_binary_attributes(attributes)
         self.load_from_binary_method.add_instructions(['return object'])
         self.new_class.add_method(self.load_from_binary_method)
@@ -211,20 +212,20 @@ class JavaScriptGenerator:
                 if self._get_attribute_name_if_sizeof(attribute['name'], attributes) is None:
                     self.new_class.add_getter_setter(attribute['name'])
 
-    def _generate_struct(self, type_descriptor, struct):
+    def _generate_schema(self, type_descriptor, schema):
         self.new_class = JavaScriptClassGenerator(type_descriptor)
-        self.exports.append(self.new_class.class_signature)
+        self.exports.append(self.new_class.class_name)
         self.constructor_initial_values = {}
-        self._generate_attributes(struct['layout'])
+        self._generate_attributes(schema['layout'])
         if self.constructor_initial_values:
             self.new_class.add_constructor(self.constructor_initial_values)
-        self._generate_load_from_binary_method(struct['layout'])
-        self._generate_serialize_method(struct['layout'])
+        self._generate_load_from_binary_method(schema['layout'])
+        self._generate_serialize_method(schema['layout'])
         return self.new_class.get_class()
 
     def _generate_concat_typedarrays(self):
         method = JavaScriptMethodGenerator('concat_typedarrays', ['array1', 'array2'])
-        self.exports.append(method.signature)
+        self.exports.append(method.name)
         method.add_instructions([
             'var newArray = new Uint8Array(array1.length + array2.length)',
             'newArray.set(array1)',
@@ -235,7 +236,7 @@ class JavaScriptGenerator:
 
     def _generate_buffer_to_uint(self):
         method = JavaScriptMethodGenerator('buffer_to_uint', ['buffer'])
-        self.exports.append(method.signature)
+        self.exports.append(method.name)
         method.add_instructions([
             'var dataView = new DataView(buffer.buffer)',
             'if (buffer.byteLength == 1)',
@@ -249,7 +250,7 @@ class JavaScriptGenerator:
 
     def _generate_uint_to_buffer(self):
         method = JavaScriptMethodGenerator('uint_to_buffer', ['uint', 'bufferSize'])
-        self.exports.append(method.signature)
+        self.exports.append(method.name)
         method.add_instructions([
             'var buffer = new ArrayBuffer(bufferSize)',
             'var dataView = new DataView(buffer)',
@@ -265,7 +266,7 @@ class JavaScriptGenerator:
 
     def _generate_fit_bytearray(self):
         method = JavaScriptMethodGenerator('fit_bytearray', ['array', 'size'])
-        self.exports.append(method.signature)
+        self.exports.append(method.name)
         method.add_instructions([
             'if (array == null) {',
             indent('var newArray = new Uint8Array(size)'),
@@ -288,7 +289,7 @@ class JavaScriptGenerator:
     def _generate_Uint8Array_consumer(self):
         self.consumer_class = JavaScriptClassGenerator('Uint8ArrayConsumable')
         self.consumer_class.add_constructor({'offset': 0, 'binary': 'binary'}, ['binary'])
-        self.exports.append(self.consumer_class.class_signature)
+        self.exports.append(self.consumer_class.class_name)
 
         get_bytes_method = JavaScriptMethodGenerator('get_bytes', ['count'])
         get_bytes_method.add_instructions([
@@ -324,7 +325,7 @@ class JavaScriptGenerator:
                 # Using the constant directly, so enum definition unneeded
                 pass
             elif value['type'] == TypeDescriptorType.Struct.value:
-                new_file += self._generate_struct(type_descriptor, value) + ['']
+                new_file += self._generate_schema(type_descriptor, value) + ['']
 
         new_file += self._generate_module_exports() + ['']
 
