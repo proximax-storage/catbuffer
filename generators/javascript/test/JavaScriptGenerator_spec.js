@@ -1,5 +1,5 @@
 var assert = require('assert')
-const GeneratedJs = require('../../../generated/js/catbuffer_generated_output')
+const GeneratedJs = require('../../../_generated/js/catbuffer_generated_output')
 
 
 describe('buffer_to_uint function', function () {
