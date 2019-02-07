@@ -85,7 +85,7 @@ class JavaScriptClassGenerator:
 
 
 class JavaScriptGenerator:
-    def __init__(self, schema):
+    def __init__(self, schema, options):
         self.schema = schema
         self.generated = None
         self.new_class = None
