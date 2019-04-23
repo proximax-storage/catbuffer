@@ -13,7 +13,7 @@ class JavaDefineTypeClassGenerator(JavaClassGenerator):
             name, schema, class_schema, enum_list)
 
     def _add_public_declarations(self):
-        self._add_constructor(self.class_schema)
+        self._add_constructor()
         self._add_constructor_stream()
         self._add_getter_setter(self.class_schema)
 
@@ -29,9 +29,9 @@ class JavaDefineTypeClassGenerator(JavaClassGenerator):
         new_getter.add_instructions(
             ['return {0}'.format(self.class_schema['size'])])
 
-    def _add_constructor(self, attribute):
-        attribute_name = attribute['name']
-        return_type = get_generated_type(self.schema, attribute)
+    def _add_constructor(self):
+        attribute_name = self.class_schema['name']
+        return_type = get_generated_type(self.schema, self.class_schema)
         new_setter = JavaMethodGenerator('public', '',
                                          self.builder_class_name,
                                          [return_type + ' ' + attribute_name])
@@ -43,8 +43,8 @@ class JavaDefineTypeClassGenerator(JavaClassGenerator):
             AttributeKind.CUSTOM: self._add_simple_setter
         }
 
-        attribute_kind = get_attribute_kind(attribute)
-        setters[attribute_kind](attribute, new_setter)
+        attribute_kind = get_attribute_kind(self.class_schema)
+        setters[attribute_kind](self.class_schema, new_setter)
         self._add_method(new_setter)
 
     def _add_constructor_stream(self):

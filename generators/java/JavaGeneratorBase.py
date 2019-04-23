@@ -17,10 +17,6 @@ class JavaGeneratorBase(ABC):
         self.class_type = None
 
     @abstractmethod
-    def _add_class_definition(self):
-        raise NotImplementedError('need to override method')
-
-    @abstractmethod
     def _add_public_declarations(self):
         raise NotImplementedError('need to override method')
 
@@ -99,11 +95,15 @@ class JavaGeneratorBase(ABC):
         self._calculate_size(new_getter)
         self._add_method(new_getter)
 
-    def generate(self):
-        self._add_class_definition()
+    def _generate_class_methods(self):
         self._add_private_declarations()
         self._add_public_declarations()
         self._add_size_getter()
         self._add_load_from_binary_method()
         self._add_serialize_method()
-        return self.class_output + ['}']
+        self.class_output += ['}']
+
+    def generate(self):
+        self._add_class_definition()
+        self._generate_class_methods()
+        return self.class_output

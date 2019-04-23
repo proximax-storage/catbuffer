@@ -104,9 +104,5 @@ class JavaEnumGenerator(JavaGeneratorBase):
     def generate(self):
         self._add_class_definition()
         self._write_enum_values()
-        self._add_private_declarations()
-        self._add_public_declarations()
-        self._add_size_getter()
-        self._add_load_from_binary_method()
-        self._add_serialize_method()
-        return self.class_output + ['}']
+        self._generate_class_methods()
+        return self.class_output
