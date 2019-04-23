@@ -373,15 +373,15 @@ class JavaClassGenerator(JavaGeneratorBase):
         load_from_binary_method.add_instructions(
             ['return new {0}(stream)'.format(self.builder_class_name)])
 
-    def _add_serialize_custom(self, add_serialize_method):
+    def _add_serialize_custom(self, serialize_method):
         if self.base_class_name is not None:
-            add_serialize_method.add_instructions(
+            serialize_method.add_instructions(
                 ['byte[] superBytes = super.serialize()'])
-            add_serialize_method.add_instructions(
+            serialize_method.add_instructions(
                 ['dataOutputStream.write(superBytes, 0, superBytes.length)'])
         self._recurse_foreach_attribute(self.class_schema['layout'],
                                         self._generate_serialize_attributes,
-                                        add_serialize_method)
+                                        serialize_method)
 
     def _add_constructor_stream(self):
         load_stream_constructor = JavaMethodGenerator(

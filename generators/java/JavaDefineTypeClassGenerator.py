@@ -21,9 +21,9 @@ class JavaDefineTypeClassGenerator(JavaClassGenerator):
         self._add_private_declaration(self.class_schema)
         self.class_output += ['']
 
-    def _add_serialize_custom(self, add_serialize_method):
+    def _add_serialize_custom(self, serialize_method):
         self._generate_serialize_attributes(
-            self.class_schema, add_serialize_method)
+            self.class_schema, serialize_method)
 
     def _calculate_size(self, new_getter):
         new_getter.add_instructions(
