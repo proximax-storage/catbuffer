@@ -1,108 +1,112 @@
-from .Helpers import get_generated_class_name, get_builtin_type, indent, get_attribute_size
+from .Helpers import get_builtin_type, indent, get_attribute_size
 from .Helpers import get_read_method_name, get_reverse_method_name, get_write_method_name
+from .Helpers import get_comments_if_present
 from .JavaMethodGenerator import JavaMethodGenerator
+from .JavaGeneratorBase import JavaGeneratorBase
 
 
 def get_type(attribute):
     return get_builtin_type(attribute['size'])
 
 
-class JavaEnumGenerator():
+def create_enum_name(name):
+    return name[0] + ''.join('_' + x if x.isupper() else x for x in name[1:])
+
+
+class JavaEnumGenerator(JavaGeneratorBase):
     """Java enum generator"""
 
-    def __init__(self, name, schema, attribute):
-        self.enum_name = get_generated_class_name(name)
-        self.enum_output = ['public enum {0} {{'.format(self.enum_name)]
-        self.schema = schema
-        self.privates = []
-        self.attribute = attribute
+    def __init__(self, name, schema, class_schema):
+        super(JavaEnumGenerator, self).__init__(name, schema, class_schema)
         self.enum_values = {}
+        self.class_type = 'enum'
 
-        self._add_enum_values(self.attribute)
+        self._add_enum_values(self.class_schema)
 
-    def _add_private_declaration(self, attribute):
-        var_type = get_type(attribute)
-        self.enum_output += [
+    def _add_private_declaration(self):
+        var_type = get_type(self.class_schema)
+        self.class_output += [
             indent('private final {0} value;'.format(var_type))] + ['']
 
     def _add_enum_values(self, enum_attribute):
         enum_attribute_values = enum_attribute['values']
         for current_attribute in enum_attribute_values:
             self.add_enum_value(
-                current_attribute['name'], current_attribute['value'])
+                current_attribute['name'],
+                current_attribute['value'],
+                current_attribute['comments'])
 
     def _write_enum_values(self):
-        enum_type = get_type(self.attribute)
+        enum_type = get_type(self.class_schema)
         enum_length = len(self.enum_values)
         count = 1
-        for name, value in self.enum_values.items():
-            line = '{0}(({1}){2})'.format(name.upper(), enum_type, value)
+        for name, value_comments in self.enum_values.items():
+            value, comments = value_comments
+            comment_line = get_comments_if_present(comments)
+            if comment_line is not None:
+                self.class_output += [indent(comment_line)]
+            line = '{0}(({1}) {2})'.format(name.upper(), enum_type, value)
             line += ',' if count < enum_length else ';'
-            self.enum_output += [indent(line)]
+            self.class_output += [indent(line)]
             count += 1
-        self.enum_output += ['']
+        self.class_output += ['']
 
-    def _add_constructor(self, attribute):
-        enum_type = get_type(attribute)
-        constructor_method = JavaMethodGenerator('private', '', self.enum_name, [
+    def _add_constructor(self):
+        enum_type = get_type(self.class_schema)
+        constructor_method = JavaMethodGenerator('private', '', self.builder_class_name, [
             '{0} value'.format(enum_type)])
         constructor_method.add_instructions(['this.value = value'])
-        self.add_method(constructor_method)
+        self._add_method(constructor_method)
 
-    def _add_load_from_binary_method(self, attribute):
-        load_from_binary_method = JavaMethodGenerator(
-            'public', self.enum_name, 'loadFromBinary',
-            ['DataInput stream'], 'throws Exception', True)
-        load_from_binary_method.add_instructions(
-            ['{0} val = stream.{1}()'.format(
-                get_type(attribute), get_read_method_name(attribute['size']))])
-        size = get_attribute_size(self.schema, attribute)
+    def _add_load_from_binary_custom(self, load_from_binary_method):
+        read_data_line = 'stream.{0}()'.format(
+            get_read_method_name(self.class_schema['size']))
+        size = get_attribute_size(self.schema, self.class_schema)
         reverse_byte_method = get_reverse_method_name(
-            size).format('val')
+            size).format(read_data_line)
         load_from_binary_method.add_instructions(
-            ['val = {0}'.format(reverse_byte_method)])
+            ['{0} streamValue = {1}'.format(get_type(self.class_schema), reverse_byte_method)])
         load_from_binary_method.add_instructions(
-            ['for ({0} current : {0}.values()) {{'.format(self.enum_name)], False)
+            ['for ({0} current : {0}.values()) {{'.format(self.builder_class_name)], False)
         load_from_binary_method.add_instructions(
-            [indent('if (val == current.value)')], False)
+            [indent('if (streamValue == current.value)')], False)
         load_from_binary_method.add_instructions(
             [indent('return current', 2)])
         load_from_binary_method.add_instructions(
             ['}'], False)
         load_from_binary_method.add_instructions(
-            ['throw new RuntimeException(val + " was not a backing value for {0}.")'
-             .format(self.enum_name)])
-        self.add_method(load_from_binary_method)
+            ['throw new RuntimeException(streamValue + " was not a backing value for {0}.")'
+             .format(self.builder_class_name)])
 
-    def _add_serialize_method(self, attribute):
-        serialize_method = JavaMethodGenerator(
-            'public', 'byte[]', 'serialize', [], 'throws Exception')
-        serialize_method.add_instructions(
-            ['ByteArrayOutputStream bos = new ByteArrayOutputStream()'])
-        serialize_method.add_instructions(
-            ['DataOutputStream stream = new DataOutputStream(bos)'])
-        size = get_attribute_size(self.schema, attribute)
+    def _add_serialize_custom(self, serialize_method):
+        size = get_attribute_size(self.schema, self.class_schema)
         reverse_byte_method = get_reverse_method_name(
             size).format('this.value')
         serialize_method.add_instructions([
-            'stream.{0}({1})'.format(
+            'dataOutputStream.{0}({1})'.format(
                 get_write_method_name(size), reverse_byte_method)
         ])
-        serialize_method.add_instructions(['stream.close()'])
-        serialize_method.add_instructions(['return bos.toByteArray()'])
-        self.add_method(serialize_method)
 
-    def add_method(self, method):
-        self.enum_output += [indent(line)
-                             for line in method.get_method()] + ['']
+    def add_enum_value(self, name, value, comments):
+        self.enum_values[create_enum_name(name)] = [value, comments]
 
-    def add_enum_value(self, name, value):
-        self.enum_values[name] = value
+    def _add_public_declarations(self):
+        pass
+
+    def _add_private_declarations(self):
+        self._add_private_declaration()
+        self._add_constructor()
+
+    def _calculate_size(self, new_getter):
+        new_getter.add_instructions(
+            ['return {0}'.format(self.class_schema['size'])])
 
     def generate(self):
+        self._add_class_definition()
         self._write_enum_values()
-        self._add_private_declaration(self.attribute)
-        self._add_constructor(self.attribute)
-        self._add_load_from_binary_method(self.attribute)
-        self._add_serialize_method(self.attribute)
-        return self.enum_output + ['}']
+        self._add_private_declarations()
+        self._add_public_declarations()
+        self._add_size_getter()
+        self._add_load_from_binary_method()
+        self._add_serialize_method()
+        return self.class_output + ['}']

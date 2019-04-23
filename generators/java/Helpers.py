@@ -49,13 +49,12 @@ def get_attribute_size(schema, attribute):
     return attribute['size']
 
 
-def get_attribute_kind(schema, attribute):
+def get_attribute_kind(attribute):
     attribute_type = attribute['type']
     if is_struct_type(attribute_type) or is_enum_type(attribute_type):
         return AttributeKind.CUSTOM
     if 'size' not in attribute:
-        type_descriptor = schema[attribute_type]
-        return get_attribute_kind(schema, type_descriptor)
+        return AttributeKind.CUSTOM
 
     attribute_size = attribute['size']
 
@@ -81,12 +80,10 @@ def indent(code, n_indents=1):
     return ' ' * 4 * n_indents + code
 
 
-def get_attribute_if_size(attribute_name, attributes):
-    for attribute in attributes:
-        if 'size' in attribute and attribute['size'] == attribute_name:
-            return attribute['name']
-
-    return None
+def get_attribute_if_size(attribute_name, attributes, schema):
+    value = get_attribute_property_equal(
+        schema, attributes, 'size', attribute_name)
+    return value['name'] if value is not None else None
 
 
 def get_attribute_property_equal(schema, attributes, attribute_name, attribute_value):
@@ -144,7 +141,7 @@ def get_write_method_name(size):
 
 def get_generated_type(schema, attribute):
     typename = attribute['type']
-    attribute_kind = get_attribute_kind(schema, attribute)
+    attribute_kind = get_attribute_kind(attribute)
     if not is_byte_type(typename):
         typename = get_generated_class_name(typename)
 
@@ -156,3 +153,9 @@ def get_generated_type(schema, attribute):
         return 'java.util.ArrayList<{0}>'.format(typename)
 
     return typename
+
+
+def get_comments_if_present(comment):
+    if comment:
+        return '/** {0} */'.format(comment)
+    return None
