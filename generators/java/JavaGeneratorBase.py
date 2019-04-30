@@ -8,8 +8,8 @@ from .JavaMethodGenerator import JavaMethodGenerator
 
 class JavaGeneratorBase(ABC):
 
+    # pylint: disable=too-many-instance-attributes
     def __init__(self, name, schema, class_schema):
-        # pylint: disable=too-many-instance-attributes
         self.builder_class_name = get_generated_class_name(name)
         self.name = name
         self.base_class_name = None
