@@ -54,8 +54,11 @@ class JavaEnumGenerator(JavaGeneratorBase):
     def _add_constructor(self):
         enum_type = get_type(self.class_schema)
         constructor_method = JavaMethodGenerator('private', '', self.builder_class_name, [
-            '{0} value'.format(enum_type)])
+            'final {0} value'.format(enum_type)])
         constructor_method.add_instructions(['this.value = value'])
+        self._add_method_documentation(constructor_method, 'Constructor.',
+                                       [('value', self.class_schema['comments'])], None, None)
+
         self._add_method(constructor_method)
 
     def _add_load_from_binary_custom(self, load_from_binary_method):

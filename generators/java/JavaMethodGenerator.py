@@ -16,6 +16,8 @@ class JavaMethodGenerator:
             line += ' {0}'.format(exception_list)
         line += ' {'
         self.method_output = [line]
+        self.annotation_output = []
+        self.documentation_output = []
 
     def add_instructions(self, instructions, add_semicolon=True):
         for instruction in instructions:
@@ -24,7 +26,11 @@ class JavaMethodGenerator:
             self.method_output.append(indent(instruction))
 
     def get_method(self):
-        return self.method_output + ['}']
+        return self.documentation_output + self.annotation_output + self.method_output + ['}']
 
     def add_annotation(self, annotation):
-        self.method_output.insert(0, annotation)
+        self.annotation_output.append(annotation)
+
+    def add_documentations(self, documentations):
+        for documentation in documentations:
+            self.documentation_output.append(documentation)
