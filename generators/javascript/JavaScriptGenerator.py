@@ -87,21 +87,22 @@ class JavaScriptGenerator:
                     # No need to check if attribute['size'] is int (fixed) or a variable reference,
                     # because attribute['size'] will either be a number or a previously code generated reference
                     block.add_instructions(['object.{} = []'.format(attribute['name'])])
-                    block.add_instructions(['var i', 'for (i = 0; i < {}; i++) {{'.format(attribute['size'])])
+                    for_block = JavaScriptBlockGenerator()
+                    for_block.wrap(BlockType.FOR, '< {}'.format(attribute['size']), 'i')
                     if attribute_typedescriptor['type'] == TypeDescriptorType.Struct.value:
-                        block.add_instructions(
-                            indent(['var new{0} = {1}.loadFromBinary(consumableBuffer)'.format(
+                        for_block.add_instructions(
+                            ['var new{0} = {1}.loadFromBinary(consumableBuffer)'.format(
                                 attribute['name'], JavaScriptClassGenerator.get_generated_class_name(attribute['type'])
-                            )])
+                            )]
                         )
                     elif attribute_typedescriptor['type'] == TypeDescriptorType.Enum.value:
-                        block.add_instructions(
-                            indent(['var new{0} = consumableBuffer.get_bytes({1})'.format(
+                        for_block.add_instructions(
+                            ['var new{0} = consumableBuffer.get_bytes({1})'.format(
                                 attribute['name'], self._get_type_size(attribute_typedescriptor)
-                            )])
+                            )]
                         )
-                    block.add_instructions(indent(['object.{0}.push(new{0})'.format(attribute['name'])]))
-                    block.add_instructions(['}'])
+                    for_block.add_instructions(['object.{0}.push(new{0})'.format(attribute['name'])])
+                    block.add_block(for_block)
 
                 # Single object
                 else:
@@ -164,21 +165,22 @@ class JavaScriptGenerator:
                 if 'size' in attribute:
                     # No need to check if attribute['size'] is int (fixed) or a variable reference,
                     # because we iterate with a for util in both cases
-                    self.serialize_function.add_instructions(['var i', 'for (i in this.{}) {{'.format(attribute['name'])])
+                    for_block = JavaScriptBlockGenerator()
+                    for_block.wrap(BlockType.FOR, '< this.{}.length'.format(attribute['name']), 'i')
                     if attribute_typedescriptor['type'] == TypeDescriptorType.Struct.value:
-                        self.serialize_function.add_instructions(
-                            indent(['newArray = concat_typedarrays(newArray, this.{}[i].serialize())'.format(attribute['name'])])
+                        for_block.add_instructions(
+                            ['newArray = concat_typedarrays(newArray, this.{}[i].serialize())'.format(attribute['name'])]
                         )
                     elif attribute_typedescriptor['type'] == TypeDescriptorType.Enum.value:
-                        self.serialize_function.add_instructions(
-                            indent(['var fitArray{0} = fit_bytearray(this.{0}, {1})'.format(
+                        for_block.add_instructions(
+                            ['var fitArray{0} = fit_bytearray(this.{0}, {1})'.format(
                                 attribute['name'], self._get_type_size(attribute_typedescriptor)
-                            )])
+                            )]
                         )
-                        self.serialize_function.add_instructions(
-                            indent(['newArray = concat_typedarrays(newArray, fitArray{})'.format(attribute['name'])])
+                        for_block.add_instructions(
+                            ['newArray = concat_typedarrays(newArray, fitArray{})'.format(attribute['name'])]
                         )
-                    self.serialize_function.add_instructions(['}'])
+                    self.serialize_function.add_block(for_block)
 
                 # Single object
                 else:

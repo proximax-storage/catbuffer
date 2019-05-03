@@ -8,6 +8,7 @@ class BlockType(Enum):
     IF = 1
     ELSE = 2
     ELIF = 3
+    FOR = 4
 
 
 class JavaScriptBlockGenerator:
@@ -15,10 +16,12 @@ class JavaScriptBlockGenerator:
         self.type = BlockType.NONE
         self.rule = ''
         self.instructions = []
+        self.iterator = None
 
-    def wrap(self, type, rule):
+    def wrap(self, type, rule, iterator=None):
         self.type = type
         self.rule = rule
+        self.iterator = iterator
 
     def add_instructions(self, instructions):
         self.instructions += instructions
@@ -34,5 +37,10 @@ class JavaScriptBlockGenerator:
                 return ['else if ({0}) {{'.format(self.rule)] + indent(self.instructions) + ['}']
             if self.type is BlockType.ELSE:
                 return ['else {'] + indent(self.instructions) + ['}']
+            if self.type is BlockType.FOR:
+                return [
+                    'var {0}'.format(self.iterator),
+                    'for ({0} = 0; {0} {1}; {0}++) {{'.format(self.iterator, self.rule)
+                ] + indent(self.instructions) + ['}']
 
         return self.instructions
