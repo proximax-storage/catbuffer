@@ -169,7 +169,7 @@ class JavaScriptGenerator:
                     for_block.wrap(BlockType.FOR, '< this.{}.length'.format(attribute['name']), 'i')
                     if attribute_typedescriptor['type'] == TypeDescriptorType.Struct.value:
                         for_block.add_instructions(
-                            ['newArray = concat_typedarrays(newArray, this.{}[i].serialize())'.format(attribute['name'])]
+                            ['newArray = concat_typedarrays(newArray, this.{0}[{1}].serialize())'.format(attribute['name'], for_block.iterator)]
                         )
                     elif attribute_typedescriptor['type'] == TypeDescriptorType.Enum.value:
                         for_block.add_instructions(
