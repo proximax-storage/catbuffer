@@ -1,7 +1,7 @@
-from .JavaScriptBlockGenerator import BlockType, JavaScriptBlockGenerator
-from .JavaScriptClassGenerator import JavaScriptClassGenerator
-from .JavaScriptFunctionGenerator import FunctionType, JavaScriptFunctionGenerator
-from .JavaScriptUtils import indent
+from .javascript_builder.JavaScriptBlockGenerator import BlockType, JavaScriptBlockGenerator
+from .javascript_builder.JavaScriptClassGenerator import JavaScriptClassGenerator
+from .javascript_builder.JavaScriptFunctionGenerator import FunctionType, JavaScriptFunctionGenerator
+from .javascript_builder.JavaScriptUtils import indent
 
 
 from enum import Enum
