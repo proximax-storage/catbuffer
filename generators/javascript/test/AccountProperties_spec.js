@@ -1,5 +1,5 @@
 var assert = require('assert')
-const GeneratedJs = require('../../../generated/js/catbuffer_generated_output')
+const GeneratedJs = require('../../../_generated/js/catbuffer_generated_output')
 
 
 describe('MosaicBuffer generated class', function () {
