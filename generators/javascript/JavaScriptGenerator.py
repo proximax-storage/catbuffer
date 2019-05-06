@@ -3,7 +3,6 @@ from .javascript_builder.JavaScriptClassGenerator import JavaScriptClassGenerato
 from .javascript_builder.JavaScriptFunctionGenerator import FunctionType, JavaScriptFunctionGenerator
 from .javascript_builder.JavaScriptUtils import indent
 
-
 from enum import Enum
 from generators.Descriptor import Descriptor
 
@@ -29,7 +28,7 @@ def _get_attribute_name_if_sizeof(attribute_name, attributes):
 class JavaScriptGenerator:
     def __init__(self, schema, options):
         self.schema = schema
-        self.generated = None
+        self.current = None
         self.new_class = None
         self.load_from_binary_function = None
         self.serialize_function = None
@@ -37,16 +36,21 @@ class JavaScriptGenerator:
         self.exports = None
 
     def __iter__(self):
-        self.generated = False
+        self.current = iter(self.schema)
         return self
 
     def __next__(self):
-        if self.generated:
-            raise StopIteration
+        name = next(self.current)
+        while self.schema[name]['type'] is not 'struct' or self._is_inlined_in_schema(name):
+            name = next(self.current)
+        code = self.generate(name)
+        return Descriptor('{}Buffer.js'.format(name), code)
 
-        code = self.generate()
-        self.generated = True
-        return Descriptor('catbuffer_generated_output.js', code)
+    def _is_inlined_in_schema(self, name):
+        for schema in self.schema.values():
+            if 'layout' in schema and list(filter(lambda field: field['type'] == name and 'disposition' in field and field['disposition'] == 'inline', schema['layout'])) != []:
+                return True
+        return False
 
     def _get_type_size(self, attribute):
         if attribute['type'] != TypeDescriptorType.Byte.value and attribute['type'] != TypeDescriptorType.Enum.value:
@@ -221,168 +225,23 @@ class JavaScriptGenerator:
         self._generate_serialize_function(schema['layout'])
         return self.new_class.get_instructions()
 
-    def _generate_concat_typedarrays(self):
-        function = JavaScriptFunctionGenerator(FunctionType.ARROW_FUNCTION)
-        function.set_name('concat_typedarrays')
-        function.set_params(['array1', 'array2'])
-        self.exports.append(function.name)
-        function.add_instructions([
-            'var newArray = new Uint8Array(array1.length + array2.length)',
-            'newArray.set(array1)',
-            'newArray.set(array2, array1.length)',
-            'return newArray',
-        ])
-        return function.get_instructions()
-
-    def _generate_buffer_to_uint(self):
-        function = JavaScriptFunctionGenerator(FunctionType.ARROW_FUNCTION)
-        function.set_name('buffer_to_uint')
-        function.set_params(['buffer'])
-        self.exports.append(function.name)
-        function.add_instructions(['var dataView = new DataView(buffer.buffer)'])
-
-        block = JavaScriptBlockGenerator()
-        block.wrap(BlockType.IF, 'buffer.byteLength == 1')
-        block.add_instructions([
-            'return dataView.getUint8(0, true)',
-        ])
-        function.add_block(block)
-
-        block = JavaScriptBlockGenerator()
-        block.wrap(BlockType.ELIF, 'buffer.byteLength == 2')
-        block.add_instructions([
-            'return dataView.getUint16(0, true)',
-        ])
-        function.add_block(block)
-
-        block = JavaScriptBlockGenerator()
-        block.wrap(BlockType.ELIF, 'buffer.byteLength == 4')
-        block.add_instructions([
-            'return dataView.getUint32(0, true)',
-        ])
-        function.add_block(block)
-
-        return function.get_instructions()
-
-    def _generate_uint_to_buffer(self):
-        function = JavaScriptFunctionGenerator(FunctionType.ARROW_FUNCTION)
-        function.set_name('uint_to_buffer')
-        function.set_params(['uint', 'bufferSize'])
-        self.exports.append(function.name)
-        function.add_instructions([
-            'var buffer = new ArrayBuffer(bufferSize)',
-            'var dataView = new DataView(buffer)',
-        ])
-
-        block = JavaScriptBlockGenerator()
-        block.wrap(BlockType.IF, 'bufferSize == 1')
-        block.add_instructions([
-            'dataView.setUint8(0, uint, true)',
-        ])
-        function.add_block(block)
-
-        block = JavaScriptBlockGenerator()
-        block.wrap(BlockType.ELIF, 'bufferSize == 2')
-        block.add_instructions([
-            'dataView.setUint16(0, uint, true)',
-        ])
-        function.add_block(block)
-
-        block = JavaScriptBlockGenerator()
-        block.wrap(BlockType.ELIF, 'bufferSize == 4')
-        block.add_instructions([
-            'dataView.setUint32(0, uint, true)',
-        ])
-        function.add_block(block)
-
-        function.add_instructions(['return new Uint8Array(buffer)'])
-
-        return function.get_instructions()
-
-    def _generate_fit_bytearray(self):
-        function = JavaScriptFunctionGenerator(FunctionType.ARROW_FUNCTION)
-        function.set_name('fit_bytearray')
-        function.set_params(['array', 'size'])
-        self.exports.append(function.name)
-
-        block = JavaScriptBlockGenerator()
-        block.wrap(BlockType.IF, 'array == null')
-        block.add_instructions([
-            'var newArray = new Uint8Array(size)',
-            'newArray.fill(0)',
-            'return newArray',
-        ])
-        function.add_block(block)
-
-        block = JavaScriptBlockGenerator()
-        block.wrap(BlockType.IF, 'array.length > size')
-        block.add_instructions([
-            'throw new RangeError("Data size larger than allowed")'
-        ])
-        function.add_block(block)
-
-        block = JavaScriptBlockGenerator()
-        block.wrap(BlockType.ELIF, 'array.length < size')
-        block.add_instructions([
-            'var newArray = new Uint8Array(size)',
-            'newArray.fill(0)',
-            'newArray.set(array, size - array.length)',
-            'return newArray',
-        ])
-        function.add_block(block)
-
-        function.add_instructions(['return array'])
-
-        return function.get_instructions()
-
-    def _generate_Uint8Array_consumer(self):
-        self.consumer_class = JavaScriptClassGenerator('Uint8ArrayConsumable')
-        self.consumer_class.add_constructor({'offset': 0, 'binary': 'binary'}, ['binary'])
-        self.exports.append(self.consumer_class.class_name)
-
-        get_bytes_function = JavaScriptFunctionGenerator()
-        get_bytes_function.set_name('get_bytes')
-        get_bytes_function.set_params(['count'])
-
-        block = JavaScriptBlockGenerator()
-        block.wrap(BlockType.IF, 'count + this.offset > this.binary.length')
-        block.add_instructions([
-            'throw new RangeError()',
-        ])
-        get_bytes_function.add_block(block)
-
-        get_bytes_function.add_instructions([
-            'var bytes = this.binary.slice(this.offset, this.offset + count)',
-            'this.offset += count',
-            'return bytes',
-        ])
-        self.consumer_class.add_function(get_bytes_function)
-
-        return self.consumer_class.get_instructions()
-
     def _generate_module_exports(self):
         return ['module.exports = {'] + indent([export + ',' for export in self.exports]) + ['};']
 
-    def generate(self):
+    def generate(self, name):
         self.exports = []
 
         new_file = ['/*** File automatically generated by Catbuffer ***/', '']
 
-        new_file += self._generate_concat_typedarrays() + ['']
-        new_file += self._generate_fit_bytearray() + ['']
-        new_file += self._generate_Uint8Array_consumer() + ['']
-        new_file += self._generate_buffer_to_uint() + ['']
-        new_file += self._generate_uint_to_buffer() + ['']
-
-        for type_descriptor, value in self.schema.items():
-            if value['type'] == TypeDescriptorType.Byte.value:
-                # Typeless environment, values will be directly assigned
-                pass
-            elif value['type'] == TypeDescriptorType.Enum.value:
-                # Using the constant directly, so enum definition unneeded
-                pass
-            elif value['type'] == TypeDescriptorType.Struct.value:
-                new_file += self._generate_schema(type_descriptor, value) + ['']
+        schema_type = self.schema[name]['type']
+        if schema_type == TypeDescriptorType.Byte.value:
+            # Typeless environment, values will be directly assigned
+            pass
+        elif schema_type == TypeDescriptorType.Enum.value:
+            # Using the constant directly, so enum definition unneeded
+            pass
+        elif schema_type == TypeDescriptorType.Struct.value:
+            new_file += self._generate_schema(name, self.schema[name]) + ['']
 
         new_file += self._generate_module_exports() + ['']
 
