@@ -1,16 +1,12 @@
 from .Helpers import get_builtin_type, indent, get_attribute_size
+from .Helpers import get_comments_if_present, create_enum_name
 from .Helpers import get_read_method_name, get_reverse_method_name, get_write_method_name
-from .Helpers import get_comments_if_present
-from .JavaMethodGenerator import JavaMethodGenerator
 from .JavaGeneratorBase import JavaGeneratorBase
+from .JavaMethodGenerator import JavaMethodGenerator
 
 
 def get_type(attribute):
     return get_builtin_type(attribute['size'])
-
-
-def create_enum_name(name):
-    return name[0] + ''.join('_' + x if x.isupper() else x for x in name[1:])
 
 
 class JavaEnumGenerator(JavaGeneratorBase):
@@ -25,8 +21,8 @@ class JavaEnumGenerator(JavaGeneratorBase):
 
     def _add_private_declaration(self):
         var_type = get_type(self.class_schema)
-        self.class_output += [
-            indent('private final {0} value;'.format(var_type))] + ['']
+        self.class_output += [indent(get_comments_if_present('Enum value.'))]
+        self.class_output += [indent('private final {0} value;'.format(var_type))] + ['']
 
     def _add_enum_values(self, enum_attribute):
         enum_attribute_values = enum_attribute['values']
@@ -53,7 +49,7 @@ class JavaEnumGenerator(JavaGeneratorBase):
 
     def _add_constructor(self):
         enum_type = get_type(self.class_schema)
-        constructor_method = JavaMethodGenerator('private', '', self.builder_class_name, [
+        constructor_method = JavaMethodGenerator('', '', self.builder_class_name, [
             'final {0} value'.format(enum_type)])
         constructor_method.add_instructions(['this.value = value'])
         self._add_method_documentation(constructor_method, 'Constructor.',
@@ -68,18 +64,9 @@ class JavaEnumGenerator(JavaGeneratorBase):
         reverse_byte_method = get_reverse_method_name(
             size).format(read_data_line)
         load_from_binary_method.add_instructions(
-            ['{0} streamValue = {1}'.format(get_type(self.class_schema), reverse_byte_method)])
-        load_from_binary_method.add_instructions(
-            ['for ({0} current : {0}.values()) {{'.format(self.builder_class_name)], False)
-        load_from_binary_method.add_instructions(
-            [indent('if (streamValue == current.value)')], False)
-        load_from_binary_method.add_instructions(
-            [indent('return current', 2)])
-        load_from_binary_method.add_instructions(
-            ['}'], False)
-        load_from_binary_method.add_instructions(
-            ['throw new RuntimeException(streamValue + " was not a backing value for {0}.")'
-             .format(self.builder_class_name)])
+            ['final {0} streamValue = {1}'.format(
+                get_type(self.class_schema), reverse_byte_method)])
+        load_from_binary_method.add_instructions(['return rawValueOf(streamValue)'])
 
     def _add_serialize_custom(self, serialize_method):
         size = get_attribute_size(self.schema, self.class_schema)
@@ -94,7 +81,7 @@ class JavaEnumGenerator(JavaGeneratorBase):
         self.enum_values[create_enum_name(name)] = [value, comments]
 
     def _add_public_declarations(self):
-        pass
+        self._add_raw_value_of_method()
 
     def _add_private_declarations(self):
         self._add_private_declaration()
@@ -103,6 +90,30 @@ class JavaEnumGenerator(JavaGeneratorBase):
     def _calculate_size(self, new_getter):
         new_getter.add_instructions(
             ['return {0}'.format(self.class_schema['size'])])
+
+    def _add_raw_value_of_method(self):
+        enum_type = get_type(self.class_schema)
+        new_method = JavaMethodGenerator(
+            'public', self.builder_class_name, 'rawValueOf',
+            ['final {0} value'.format(enum_type)], '', True)
+        new_method.add_instructions(
+            ['for ({0} current : {0}.values()) {{'.format(self.builder_class_name)], False)
+        new_method.add_instructions(
+            [indent('if (value == current.value) {')], False)
+        new_method.add_instructions(
+            [indent('return current', 2)])
+        new_method.add_instructions(
+            [indent('}')], False)
+        new_method.add_instructions(
+            ['}'], False)
+        new_method.add_instructions(
+            ['throw new IllegalArgumentException(value + " was not a backing value for {0}.")'
+             .format(self.builder_class_name)])
+        self._add_method_documentation(new_method, 'Get enum value.',
+                                       [('value', 'The raw value of the enum')],
+                                       'enum value', None)
+
+        self._add_method(new_method)
 
     def generate(self):
         self._add_class_definition()

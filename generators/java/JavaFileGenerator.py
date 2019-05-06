@@ -1,9 +1,11 @@
 import os
+
 from generators.Descriptor import Descriptor
+
 from .Helpers import is_byte_type, is_enum_type, is_struct_type, get_generated_class_name
-from .JavaEnumGenerator import JavaEnumGenerator
 from .JavaClassGenerator import JavaClassGenerator
 from .JavaDefineTypeClassGenerator import JavaDefineTypeClassGenerator
+from .JavaEnumGenerator import JavaEnumGenerator
 
 
 class JavaFileGenerator:
@@ -31,13 +33,18 @@ class JavaFileGenerator:
                 self.code = [line.strip() for line in header]
 
     def set_import(self):
-        self.code += ['import java.lang.*;']
-        self.code += ['import java.io.*;']
-        self.code += ['import java.nio.*;']
-        self.code += ['import io.nem.catapult.builders.*;'] + ['']
+        self.code += ['import java.io.ByteArrayOutputStream;']
+        self.code += ['import java.io.DataInput;']
+        self.code += ['import java.io.DataOutputStream;']
 
     def set_package(self):
         self.code += ['package io.nem.catapult.builders;'] + ['']
+
+    def update_code(self, generator):
+        generated_class = generator.generate()
+        for import_type in generator.get_required_import():
+            self.code += ['import {0};'.format(import_type)]
+        self.code += [''] + generated_class
 
     def generate(self):
         for type_descriptor, value in self.schema.items():
@@ -51,18 +58,17 @@ class JavaFileGenerator:
                 new_class = JavaDefineTypeClassGenerator(
                     type_descriptor, self.schema, value,
                     JavaFileGenerator.enum_class_list)
-                self.code += new_class.generate()
+                self.update_code(new_class)
                 yield self.code, get_generated_class_name(type_descriptor)
             elif is_enum_type(attribute_type):
                 JavaFileGenerator.enum_class_list[type_descriptor] = JavaEnumGenerator(
                     type_descriptor, self.schema, value)
             elif is_struct_type(attribute_type):
-                # skip all the inline classes
                 if JavaClassGenerator.should_generate_class(type_descriptor):
                     new_class = JavaClassGenerator(
                         type_descriptor, self.schema, value,
                         JavaFileGenerator.enum_class_list)
-                    self.code += new_class.generate()
+                    self.update_code(new_class)
                     yield self.code, get_generated_class_name(type_descriptor)
 
         # write all the enum last just in case there are 'dynamic values'
@@ -71,5 +77,5 @@ class JavaFileGenerator:
             self.prepend_copyright(self.options['copyright'])
             self.set_package()
             self.set_import()
-            self.code += enum_class.generate()
+            self.code += [''] + enum_class.generate()
             yield self.code, get_generated_class_name(type_descriptor)

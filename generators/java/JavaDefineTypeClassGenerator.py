@@ -1,7 +1,7 @@
 # pylint: disable=too-few-public-methods
 from .Helpers import get_generated_type, AttributeKind, get_attribute_kind
-from .JavaMethodGenerator import JavaMethodGenerator
 from .JavaClassGenerator import JavaClassGenerator
+from .JavaMethodGenerator import JavaMethodGenerator
 
 
 class JavaDefineTypeClassGenerator(JavaClassGenerator):
@@ -35,7 +35,7 @@ class JavaDefineTypeClassGenerator(JavaClassGenerator):
         param_type = get_generated_type(self.schema, self.class_schema)
         new_setter = JavaMethodGenerator('public', '',
                                          self.builder_class_name,
-                                         [param_type + ' ' + attribute_name])
+                                         ['final ' + param_type + ' ' + attribute_name])
 
         setters = {
             AttributeKind.SIMPLE: self._add_simple_setter,

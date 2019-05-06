@@ -1,8 +1,8 @@
 # pylint: disable=too-few-public-methods
 from abc import ABC, abstractmethod
 
-from .Helpers import get_attribute_property_equal
-from .Helpers import get_generated_class_name, get_comments_if_present, indent, get_builtin_type
+from .Helpers import get_attribute_property_equal, append_period_if_needed
+from .Helpers import get_generated_class_name, get_comments_from_attribute, indent, get_builtin_type
 from .JavaMethodGenerator import JavaMethodGenerator
 
 
@@ -19,6 +19,7 @@ class JavaGeneratorBase(ABC):
         self.class_schema = class_schema
         self.class_type = None
         self.finalized_class = False
+        self.required_import = set()
 
     @abstractmethod
     def _add_public_declarations(self):
@@ -87,12 +88,13 @@ class JavaGeneratorBase(ABC):
         self._add_method(serialize_method, False)
 
     def _add_class_definition(self):
-        line = get_comments_if_present(self.class_schema['comments'])
+        line = get_comments_from_attribute(self.class_schema)
         if line is not None:
             self.class_output += [line]
 
-        line = 'final ' if self.finalized_class or self.name.endswith('Body') else ''
-        line += 'public {0} {1} '.format(
+        line = 'public '
+        line += 'final ' if self.finalized_class or self.name.endswith('Body') else ''
+        line += '{0} {1} '.format(
             self.class_type, self.builder_class_name)
         if self.base_class_name is not None:
             line += 'extends {0} '.format(
@@ -118,15 +120,27 @@ class JavaGeneratorBase(ABC):
     def _add_method_documentation(method_writer, method_description, param_list,
                                   return_description, exception):
         method_writer.add_documentations(['/**'])
-        method_writer.add_documentations([' * {0}'.format(method_description)])
-        if param_list is not None:
+        method_writer.add_documentations([' * {0}'.format(
+            append_period_if_needed(method_description))])
+        method_writer.add_documentations([' *'])
+        if param_list:
             for name, description in param_list:
-                method_writer.add_documentations([' * @param {0} {1}'.format(name, description)])
-        if return_description is not None:
-            method_writer.add_documentations([' * @return {0}'.format(return_description)])
-        if exception is not None:
-            method_writer.add_documentations([' * @throws {0}'.format(exception)])
+                method_writer.add_documentations([' * @param {0} {1}'.format(
+                    name, append_period_if_needed(description))])
+        if return_description:
+            method_writer.add_documentations([' * @return {0}'.format(
+                append_period_if_needed(return_description))])
+        if exception:
+            method_writer.add_documentations([' * @throws {0}'.format(
+                append_period_if_needed(exception))])
         method_writer.add_documentations([' */'])
+
+    def _add_required_import(self, full_class):
+        if full_class not in self.required_import:
+            self.required_import.add(full_class)
+
+    def get_required_import(self):
+        return self.required_import
 
     def _generate_class_methods(self):
         self._add_private_declarations()
